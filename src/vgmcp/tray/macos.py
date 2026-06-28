@@ -94,10 +94,11 @@ def _make_app_class():
                 self.status_item,
                 None,
                 self.cap_menu,
-                rumps.MenuItem("마지막 이미지 분석 (테스트)", callback=self.analyze_last),
-                None,
-                settings,
+                rumps.MenuItem("이미지 파일 열기", callback=self.open_image),
                 self.recent_menu,
+                None,
+                rumps.MenuItem("마지막 이미지 분석 (테스트)", callback=self.analyze_last),
+                settings,
                 None,
             ]
             self.refresh()
@@ -208,7 +209,6 @@ def _make_app_class():
                     pass
                 items.append(wins_parent)
             items.append(rumps.MenuItem("영역 선택 캡처 (드래그)", callback=self.cap_region))
-            items.append(rumps.MenuItem("이미지 파일 열기...", callback=self.open_image))
             _set_children(self.cap_menu, items)
 
         def _refresh_recent_menu(self) -> None:

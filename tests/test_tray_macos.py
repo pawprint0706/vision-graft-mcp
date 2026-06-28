@@ -60,7 +60,18 @@ def test_capture_submenu(app):
     assert any("모니터" in k for k in caps)
     assert "앱 창 선택 캡처" in caps
     assert "영역 선택 캡처 (드래그)" in caps
-    assert "이미지 파일 열기..." in caps
+
+
+def test_menu_order(app):
+    keys = [k for k in app.menu.keys() if not k.startswith("Separator")]
+    # status -> 캡처 -> 이미지 파일 열기 -> 최근 이미지 -> 분석(테스트) -> 설정
+    def idx(prefix):
+        return next(i for i, k in enumerate(keys) if k.startswith(prefix))
+
+    assert idx("상태") < idx("캡처") < idx("이미지 파일 열기") < idx("최근 이미지")
+    assert idx("최근 이미지") < idx("마지막 이미지 분석") < idx("설정")
+    # '이미지 파일 열기' is now top-level, not inside the capture submenu
+    assert "이미지 파일 열기" in keys
 
 
 def test_backend_submenu_reflects_default(app):
