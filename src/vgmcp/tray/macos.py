@@ -21,7 +21,7 @@ from ..core import config as cfg
 from ..core.capture_service import perform_capture, register_image
 from ..core.environment import EnvironmentChecker
 from ..core.i18n import tr
-from ..core.mainthread import post_to_main, run_on_main
+from ..core.mainthread import post_to_main
 from ..core.models import ProviderConfig
 from ..server import host
 
@@ -138,19 +138,10 @@ def _pick_path(*, directory: bool, file_types: list[str] | None = None) -> str |
 
 
 def _notify(title: str, message: str) -> None:
-    import rumps  # noqa: PLC0415
-
-    from ..core import icons  # noqa: PLC0415
-
-    icon = icons.get_icon("normal", 128)  # brand the toast's app icon (left side)
-    icon_path = str(icon) if icon is not None else None
-
-    def _post():
-        try:
-            rumps.notification(title, None, message, icon=icon_path)
-        except TypeError:  # older rumps without an `icon` kwarg
-            rumps.notification(title, None, message)
-    run_on_main(_post)
+    """Show a message as a modal dialog (branded aperture icon) rather than a
+    toast. Toasts can't show our icon for an unbundled app, and these are all
+    failure messages anyway, so a dismissible dialog is clearer."""
+    post_to_main(lambda: _alert(title, message))
 
 
 # --------------------------------------------------------------------------- #
