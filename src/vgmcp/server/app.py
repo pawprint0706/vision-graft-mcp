@@ -130,7 +130,7 @@ def analyze_vision(
         return env.to_guide()
     from .vision_service import run_analysis  # noqa: PLC0415
 
-    return run_analysis(Path(image_path), prompt, backend)
+    return run_analysis(Path(image_path).expanduser(), prompt, backend)
 
 
 @mcp.tool

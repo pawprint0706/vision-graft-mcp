@@ -13,6 +13,7 @@ from typing import Any
 from . import clipboard
 from . import config as cfg
 from .environment import EnvironmentChecker
+from .errors import CaptureError
 from .mainthread import run_on_main
 
 
@@ -67,6 +68,8 @@ def perform_capture(
             return backend.capture_monitor(monitor_index, dest)
         except NotImplementedError:
             return {"status": "not_implemented", "feature": f"capture:{target}"}
+        except CaptureError as exc:
+            return {"status": "error", "message": str(exc)}
 
     # ScreenCaptureKit/AppKit must run on the main thread (plan §2.4.2).
     outcome = run_on_main(_do_capture)

@@ -12,6 +12,7 @@ Subcommands:
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import sys
 from pathlib import Path
@@ -21,6 +22,13 @@ from .core import credentials
 from .core.environment import EnvironmentChecker
 from .core.models import ProviderConfig
 from .core.platform import is_macos, module_available
+
+
+def _resolve_key_arg(value: str | None) -> str | None:
+    """If --key is '-', read it hidden via getpass so it never hits argv/logs."""
+    if value == "-":
+        return getpass.getpass("API 키 입력(숨김): ").strip() or None
+    return value
 
 
 def _run_app(args) -> int:
@@ -50,10 +58,11 @@ def _cmd_provider_add(args) -> int:
         return 1
 
     key_ref = None
-    if args.key:
+    key_value = _resolve_key_arg(args.key)
+    if key_value:
         # Store the key in the OS keychain (plan §7.6); never in config.
         key_ref = f"provider:{pid}"
-        credentials.set_key(key_ref, args.key)
+        credentials.set_key(key_ref, key_value)
     elif args.type != "ollama" and not credentials.has_env_fallback(args.type):
         print(
             f"경고: '{args.type}' 키가 없습니다. --key로 등록하거나 환경변수를 설정하세요.",
@@ -91,10 +100,11 @@ def _cmd_provider_update(args) -> int:
         provider.label = args.label
     if args.base_url is not None:
         provider.base_url = args.base_url
-    if args.key is not None:
+    key_value = _resolve_key_arg(args.key)
+    if key_value is not None:
         # Reuse the existing key_ref if present, else create one.
         provider.key_ref = provider.key_ref or f"provider:{provider.id}"
-        credentials.set_key(provider.key_ref, args.key)
+        credentials.set_key(provider.key_ref, key_value)
     if args.set_default:
         config.default_provider_id = provider.id
     cfg.save_config(config)
@@ -190,7 +200,7 @@ def main(argv: list[str] | None = None) -> int:
     p_add.add_argument("--label")
     p_add.add_argument("--model", help="모델명 (미지정 시 백엔드 기본값)")
     p_add.add_argument("--base-url", dest="base_url", help="custom provider의 엔드포인트")
-    p_add.add_argument("--key", help="API 키 (미지정 시 환경변수 사용; 키체인에 저장)")
+    p_add.add_argument("--key", help="API 키 ('-' 입력 시 숨김 프롬프트; 미지정 시 환경변수 사용; 키체인에 저장)")
     p_add.add_argument("--set-default", action="store_true")
     p_add.set_defaults(func=_cmd_provider_add)
 
@@ -201,7 +211,7 @@ def main(argv: list[str] | None = None) -> int:
     p_upd.add_argument("--model")
     p_upd.add_argument("--label")
     p_upd.add_argument("--base-url", dest="base_url")
-    p_upd.add_argument("--key", help="API 키 교체 (키체인에 저장)")
+    p_upd.add_argument("--key", help="API 키 교체 ('-' 입력 시 숨김 프롬프트; 키체인에 저장)")
     p_upd.add_argument("--set-default", action="store_true")
     p_upd.set_defaults(func=_cmd_provider_update)
 

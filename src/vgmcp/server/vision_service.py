@@ -58,11 +58,18 @@ def run_analysis(image_path: Path, prompt: str, backend_id: str | None) -> dict[
         backend = build_backend(provider, api_key)
     except VisionError as exc:
         return exc.to_result(provider.id)
+    except Exception as exc:  # noqa: BLE001 — misconfig shouldn't crash the tool
+        return {"status": "error", "backend": provider.id,
+                "message": f"백엔드 초기화 실패: {exc}"}
 
     try:
         report = backend.analyze(image_path, prompt)
     except VisionError as exc:
         return exc.to_result(provider.id)
+    except Exception as exc:  # noqa: BLE001 — surface unexpected failures as structured error
+        from ..core.errors import VisionError as _VE, VisionErrorCode  # noqa: PLC0415
+
+        return _VE(VisionErrorCode.UNKNOWN, f"예기치 못한 오류: {exc}").to_result(provider.id)
 
     # Success: last-used becomes the effective default going forward (plan §7.3).
     config.mark_used(provider.id)
