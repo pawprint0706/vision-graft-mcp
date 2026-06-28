@@ -47,8 +47,8 @@ class AppConfig(BaseModel):
     default_provider_id: str | None = None   # plan §7.3: first-registered, then last-used
     last_used_provider_id: str | None = None
 
-    # Clipboard supporter (plan §8)
-    clipboard_auto: bool = False
+    # Clipboard supporter (plan §8) — auto-copy enabled by default on first run
+    clipboard_auto: bool = True
     clipboard_template: str | None = None
 
     # Recent captured/opened images (plan §4.1 "최근 이미지")

@@ -30,7 +30,7 @@ _MAX_WINDOWS = 15
 _RECOMMENDED_MODEL = {"anthropic": "claude-sonnet-4-6", "openai": "gpt-4o",
                       "openrouter": "openai/gpt-4o"}
 _RECOMMENDED_LABEL = {"anthropic": "claude-sonnet-4-6", "openai": "gpt-4o",
-                      "openrouter": "gpt-4o"}
+                      "openrouter": "openai/gpt-4o"}
 
 
 # --------------------------------------------------------------------------- #
