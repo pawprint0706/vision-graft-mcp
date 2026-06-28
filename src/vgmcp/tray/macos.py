@@ -25,6 +25,13 @@ _ICON = {"green": "🟢", "yellow": "🟡", "red": "🔴", "gray": "⚪"}
 _PROVIDER_TYPES = ["anthropic", "openai", "openrouter", "custom", "ollama"]
 _MAX_WINDOWS = 15
 
+# One recommended model per cloud provider (custom/ollama intentionally omitted).
+# Value = the model id prefilled; label = how it's introduced to the user.
+_RECOMMENDED_MODEL = {"anthropic": "claude-sonnet-4-6", "openai": "gpt-4o",
+                      "openrouter": "openai/gpt-4o"}
+_RECOMMENDED_LABEL = {"anthropic": "claude-sonnet-4-6", "openai": "gpt-4o",
+                      "openrouter": "gpt-4o"}
+
 
 # --------------------------------------------------------------------------- #
 # Dialog helpers (AppKit)
@@ -37,6 +44,30 @@ def _text_input(message: str, title: str = "VGMCP", default: str = "",
                        ok="확인", cancel="취소", dimensions=(360, 120), secure=secure)
     resp = win.run()
     return resp.text.strip() if resp.clicked else None
+
+
+def _choose_from_list(message: str, title: str, options: list[str],
+                      default_index: int = 0) -> str | None:
+    """A combo-box (dropdown) selection dialog via NSAlert + NSPopUpButton.
+
+    Returns the chosen option string, or None if cancelled. Used so the user
+    selects from a fixed list instead of typing (avoids typos).
+    """
+    from AppKit import NSAlert, NSMakeRect, NSPopUpButton  # noqa: PLC0415
+
+    alert = NSAlert.alloc().init()
+    alert.setMessageText_(title)
+    alert.setInformativeText_(message)
+    alert.addButtonWithTitle_("확인")
+    alert.addButtonWithTitle_("취소")
+    popup = NSPopUpButton.alloc().initWithFrame_pullsDown_(NSMakeRect(0, 0, 280, 26), False)
+    popup.addItemsWithTitles_(list(options))
+    if 0 <= default_index < len(options):
+        popup.selectItemAtIndex_(default_index)
+    alert.setAccessoryView_(popup)
+    if alert.runModal() == 1000:  # NSAlertFirstButtonReturn (확인)
+        return popup.titleOfSelectedItem()
+    return None
 
 
 def _pick_path(*, directory: bool, file_types: list[str] | None = None) -> str | None:
@@ -213,13 +244,20 @@ def _make_app_class():
 
         def _refresh_recent_menu(self) -> None:
             config = cfg.load_config()
-            items = [
+            items = [rumps.MenuItem("타겟 폴더 열기", callback=self.open_target_folder)]
+            recents = [
                 rumps.MenuItem(Path(p).name, callback=self._make_recent_cb(p))
                 for p in config.recent_images
             ]
-            if not items:
-                items = [rumps.MenuItem("(없음)", callback=None)]
+            items += recents or [rumps.MenuItem("(최근 이미지 없음)", callback=None)]
             _set_children(self.recent_menu, items)
+
+        def open_target_folder(self, _sender=None) -> None:
+            import subprocess  # noqa: PLC0415
+
+            folder = cfg.load_config().target_folder
+            Path(folder).mkdir(parents=True, exist_ok=True)
+            subprocess.run(["open", folder], check=False)
 
         def _refresh_backend_menu(self) -> None:
             config = cfg.load_config()
@@ -409,22 +447,29 @@ def _make_app_class():
             return cb
 
         def add_provider(self, _sender=None) -> None:
-            ptype = _text_input(f"provider 유형 ({'/'.join(_PROVIDER_TYPES)})",
-                                "백엔드 추가", "anthropic")
+            # 1) provider type: pick from a dropdown (no typing -> no typos).
+            ptype = _choose_from_list("등록할 provider 종류를 선택하세요.", "백엔드 추가",
+                                      _PROVIDER_TYPES)
             if ptype is None:
                 return
-            ptype = ptype.lower()
-            if ptype not in _PROVIDER_TYPES:
-                _notify("추가 실패", f"알 수 없는 유형: {ptype}")
-                return
-            pid = _text_input("provider id (고유 이름)", "백엔드 추가", ptype)
+            # 2) unique id: typed, since registering the same type twice needs
+            #    distinct ids (e.g. two openai providers).
+            pid = _text_input(
+                "provider 고유 id를 입력하세요.\n같은 종류를 여러 개 등록하려면 서로 다르게 지정하세요.",
+                "백엔드 추가", ptype)
             if not pid:
                 return
             config = cfg.load_config()
             if config.get_provider(pid):
                 _notify("추가 실패", f"이미 존재하는 id: {pid}")
                 return
-            model = _text_input("모델명 (비우면 기본값)", "백엔드 추가", "") or ""
+            # 3) model: prefill + introduce a recommended model for cloud providers.
+            default_model = _RECOMMENDED_MODEL.get(ptype, "")
+            if ptype in _RECOMMENDED_LABEL:
+                mmsg = f"모델명 (추천: {_RECOMMENDED_LABEL[ptype]}). 비우면 기본값 사용."
+            else:
+                mmsg = "모델명 (비우면 기본값 사용)."
+            model = _text_input(mmsg, "백엔드 추가", default_model) or ""
             base_url = None
             if ptype == "custom":
                 base_url = _text_input("base_url (OpenAI 호환 엔드포인트)", "백엔드 추가", "")
