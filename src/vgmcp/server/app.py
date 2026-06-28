@@ -83,13 +83,26 @@ def take_screenshot(
     target: str = "monitor",
     monitor_index: int = 0,
     window_id: int | None = None,
+    x: int | None = None,
+    y: int | None = None,
+    w: int | None = None,
+    h: int | None = None,
 ) -> dict[str, Any]:
-    """전체화면(target='monitor') 또는 특정 윈도우(target='window')를 캡처해 타겟 폴더에 저장한다."""
+    """화면을 캡처해 타겟 폴더에 저장한다.
+
+    target:
+      - 'monitor'            : 모니터 전체화면 (monitor_index)
+      - 'window'             : 특정 윈도우 (window_id)
+      - 'region'             : 좌표 영역 (x, y, w, h; 주 디스플레이 좌상단 기준 픽셀)
+      - 'region_interactive' : 사용자가 마우스로 사각형 영역을 드래그 선택 (사용자 조작 필요)
+
+    작은 영역은 분석 시 원본 그대로, 큰 영역은 자동 다운스케일되어 전송된다(§7.5).
+    """
+    from ..capture import get_capture_backend  # noqa: PLC0415
+
     env = EnvironmentChecker().check_for_capture()
     if not env.ok:
         return env.to_guide()
-    from ..capture import get_capture_backend  # noqa: PLC0415
-
     backend = get_capture_backend()
     if backend is None:
         return _not_implemented("take_screenshot", "M2")
@@ -100,6 +113,17 @@ def take_screenshot(
             if window_id is None:
                 return {"status": "error", "message": "target='window'에는 window_id가 필요합니다."}
             result = backend.capture_window(window_id, dest)
+        elif target == "region":
+            if None in (x, y, w, h):
+                return {
+                    "status": "error",
+                    "message": "target='region'에는 x, y, w, h가 모두 필요합니다.",
+                }
+            result = backend.capture_region(x, y, w, h, dest)
+        elif target == "region_interactive":
+            result = backend.capture_region_interactive(dest)
+            if result is None:
+                return {"status": "cancelled", "message": "사용자가 영역 선택을 취소했습니다."}
         else:
             result = backend.capture_monitor(monitor_index, dest)
     except NotImplementedError:
@@ -133,11 +157,17 @@ def capture_and_analyze(
     target: str = "monitor",
     monitor_index: int = 0,
     window_id: int | None = None,
+    x: int | None = None,
+    y: int | None = None,
+    w: int | None = None,
+    h: int | None = None,
     prompt: str | None = None,
     backend: str | None = None,
 ) -> dict[str, Any]:
-    """캡처→분석을 한 번에 수행하는 편의 체인(plan §5.4)."""
-    shot = take_screenshot(target=target, monitor_index=monitor_index, window_id=window_id)
+    """캡처→분석을 한 번에 수행하는 편의 체인(plan §5.4). target은 take_screenshot과 동일."""
+    shot = take_screenshot(
+        target=target, monitor_index=monitor_index, window_id=window_id, x=x, y=y, w=w, h=h
+    )
     if shot.get("status") != "ok":
         return shot
     kwargs: dict[str, Any] = {"image_path": shot["path"], "backend": backend}

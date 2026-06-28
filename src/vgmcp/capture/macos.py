@@ -147,6 +147,65 @@ class MacOSCaptureBackend:
     def capture_window(self, window_id: int, dest: Path) -> CaptureResult:  # noqa: D102 — M3
         raise NotImplementedError("capture_window lands in M3")
 
+    def capture_region(self, x: int, y: int, w: int, h: int, dest: Path) -> CaptureResult:
+        """Programmatic region capture: full primary capture cropped to the rect.
+
+        Coordinates are pixels with the primary display's top-left as origin.
+        """
+        from PIL import Image  # noqa: PLC0415
+
+        if w <= 0 or h <= 0:
+            raise CaptureError(f"영역 크기가 유효하지 않습니다: {w}x{h}")
+        full = self.capture_monitor(0, dest)
+        full_path = Path(full.path)
+        try:
+            with Image.open(full_path) as im:
+                im.load()
+                left = max(0, x)
+                top = max(0, y)
+                right = min(im.width, x + w)
+                bottom = min(im.height, y + h)
+                if right <= left or bottom <= top:
+                    raise CaptureError("요청한 영역이 화면 범위를 벗어났습니다.")
+                cropped = im.crop((left, top, right, bottom))
+                path = dest / f"region_{_timestamp()}.png"
+                cropped.save(path, format="PNG")
+                out_w, out_h = cropped.size
+        finally:
+            # The intermediate full-screen capture is not the user's target.
+            full_path.unlink(missing_ok=True)
+        return CaptureResult(path=str(path), width=out_w, height=out_h, source="region")
+
+    def capture_region_interactive(self, dest: Path) -> CaptureResult | None:
+        """Interactive drag-select via the native `screencapture -i` (plan §6.5).
+
+        `screencapture` is Apple's supported system utility (not the obsoleted
+        CGWindowListCreateImage C API), so it gives a robust crosshair selection.
+        Returns None if the user cancels (Esc → no file written).
+        """
+        import subprocess  # noqa: PLC0415
+
+        from PIL import Image  # noqa: PLC0415
+
+        dest.mkdir(parents=True, exist_ok=True)
+        path = dest / f"region_{_timestamp()}.png"
+        # -i interactive selection, -x no capture sound.
+        try:
+            subprocess.run(
+                ["/usr/sbin/screencapture", "-i", "-x", str(path)],
+                check=True,
+                timeout=120,
+            )
+        except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+            raise CaptureError(f"screencapture 실행 실패: {exc}") from exc
+        except subprocess.TimeoutExpired:
+            return None
+        if not path.exists():
+            return None  # user cancelled the selection
+        with Image.open(path) as im:
+            width, height = im.size
+        return CaptureResult(path=str(path), width=width, height=height, source="region")
+
     def check_permission(self) -> bool:
         """Probe Screen Recording permission via SCShareableContent (plan §3.2.2)."""
         try:

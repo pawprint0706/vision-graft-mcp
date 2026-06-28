@@ -20,6 +20,14 @@ class CaptureBackend(Protocol):
 
     def capture_window(self, window_id: int, dest: Path) -> CaptureResult: ...
 
+    def capture_region(self, x: int, y: int, w: int, h: int, dest: Path) -> CaptureResult:
+        """Capture a rectangular region (pixels, primary-display top-left origin)."""
+        ...
+
+    def capture_region_interactive(self, dest: Path) -> CaptureResult | None:
+        """Let the user drag-select a rectangle; None if cancelled (plan §6.5)."""
+        ...
+
     def check_permission(self) -> bool:
         """True if screen-capture permission is granted (plan §3.2.2)."""
         ...

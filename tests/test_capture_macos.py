@@ -53,3 +53,26 @@ def test_capture_monitor_bad_index(backend, tmp_path):
 
     with pytest.raises(CaptureError):
         backend.capture_monitor(999, tmp_path)
+
+
+def test_capture_region(backend, tmp_path):
+    from pathlib import Path
+
+    from PIL import Image
+
+    result = backend.capture_region(50, 50, 320, 200, tmp_path)
+    assert result.status == "ok"
+    assert (result.width, result.height) == (320, 200)
+    p = Path(result.path)
+    assert p.exists()
+    with Image.open(p) as im:
+        assert im.size == (320, 200)
+    # The intermediate full-screen capture must be cleaned up.
+    assert [f.name for f in tmp_path.iterdir()] == [p.name]
+
+
+def test_capture_region_bad_size(backend, tmp_path):
+    from vgmcp.core.errors import CaptureError
+
+    with pytest.raises(CaptureError):
+        backend.capture_region(0, 0, 0, 100, tmp_path)
