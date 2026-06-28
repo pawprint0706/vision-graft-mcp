@@ -138,6 +138,8 @@ def capture_and_analyze(
     target: str = "monitor",
     monitor_index: int = 0,
     window_id: int | None = None,
+    app_name: str | None = None,
+    title_contains: str | None = None,
     x: int | None = None,
     y: int | None = None,
     w: int | None = None,
@@ -147,7 +149,8 @@ def capture_and_analyze(
 ) -> dict[str, Any]:
     """캡처→분석을 한 번에 수행하는 편의 체인(plan §5.4). target은 take_screenshot과 동일."""
     shot = take_screenshot(
-        target=target, monitor_index=monitor_index, window_id=window_id, x=x, y=y, w=w, h=h
+        target=target, monitor_index=monitor_index, window_id=window_id,
+        app_name=app_name, title_contains=title_contains, x=x, y=y, w=w, h=h
     )
     if shot.get("status") != "ok":
         return shot

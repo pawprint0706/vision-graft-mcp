@@ -190,6 +190,9 @@ def _cmd_capture_analyze(args) -> int:
     result = capture_and_analyze(
         target=args.target,
         monitor_index=args.monitor,
+        window_id=args.window_id,
+        app_name=args.app_name,
+        title_contains=args.title_contains,
         x=args.x, y=args.y, w=args.w, h=args.h,
         prompt=args.prompt,
         backend=args.backend,
@@ -259,6 +262,9 @@ def main(argv: list[str] | None = None) -> int:
     p_ca.add_argument("--target", default="monitor",
                       choices=["monitor", "window", "region", "region_interactive"])
     p_ca.add_argument("--monitor", type=int, default=0)
+    p_ca.add_argument("--window-id", dest="window_id", type=int)
+    p_ca.add_argument("--app-name", dest="app_name", help="target=window 셀렉터(앱 이름)")
+    p_ca.add_argument("--title-contains", dest="title_contains", help="target=window 셀렉터(제목 포함)")
     p_ca.add_argument("--x", type=int)
     p_ca.add_argument("--y", type=int)
     p_ca.add_argument("--w", type=int)
