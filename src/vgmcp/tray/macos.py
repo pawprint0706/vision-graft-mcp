@@ -73,12 +73,14 @@ def _make_app_class():
             self.recent_menu = rumps.MenuItem("최근 이미지")
             self.backend_menu = rumps.MenuItem("비전 백엔드 관리")
             self.autoclip_item = rumps.MenuItem("자동 클립보드 복사", callback=self.toggle_autoclip)
+            self.autostart_item = rumps.MenuItem("로그인 시 자동 시작", callback=self.toggle_autostart)
             settings = rumps.MenuItem("설정")
             settings.update([
                 rumps.MenuItem("타겟 폴더 설정...", callback=self.set_target_folder),
                 self.backend_menu,
                 rumps.MenuItem("클립보드 템플릿 편집...", callback=self.edit_template),
                 self.autoclip_item,
+                self.autostart_item,
                 rumps.MenuItem("환경 재검사", callback=lambda _=None: self.refresh()),
             ])
             self.menu = [
@@ -124,6 +126,9 @@ def _make_app_class():
                 self._refresh_backend_menu()
                 config = cfg.load_config()
                 self.autoclip_item.state = 1 if config.clipboard_auto else 0
+                from ..core import autostart  # noqa: PLC0415
+
+                self.autostart_item.state = 1 if autostart.is_enabled() else 0
             except Exception as exc:  # noqa: BLE001 — never let the timer kill the app
                 self.title = _ICON["red"]
                 print(f"[vgmcp tray] refresh error: {exc}")
@@ -305,6 +310,18 @@ def _make_app_class():
             config.clipboard_auto = not config.clipboard_auto
             cfg.save_config(config)
             self.autoclip_item.state = 1 if config.clipboard_auto else 0
+
+        def toggle_autostart(self, _sender=None) -> None:
+            from ..core import autostart  # noqa: PLC0415
+
+            if autostart.is_enabled():
+                autostart.disable()
+                self.autostart_item.state = 0
+                _notify("자동 시작", "로그인 시 자동 시작 해제됨")
+            else:
+                autostart.enable()
+                self.autostart_item.state = 1
+                _notify("자동 시작", "로그인 시 자동 시작 설정됨")
 
         # ---- backend management ------------------------------------------- #
         def _make_setdefault_cb(self, pid: str):

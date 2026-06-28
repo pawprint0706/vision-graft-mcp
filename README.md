@@ -44,6 +44,10 @@ pip install -e ".[macos,anthropic,openai]"   # macOS dev with cloud backends
 vgmcp            # resident tray app + embedded host (macOS)
 vgmcp check      # print environment check result and exit
 vgmcp --no-tray  # run the HTTP host in the foreground (headless)
+
+vgmcp autostart enable    # start the tray at login (LaunchAgent); also a tray toggle
+vgmcp autostart disable
+vgmcp autostart status
 ```
 
 Register the adapter in your MCP client (e.g. Cursor):

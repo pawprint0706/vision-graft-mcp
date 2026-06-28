@@ -168,6 +168,22 @@ def _cmd_analyze(args) -> int:
     return 0 if result.get("status") == "ok" else 1
 
 
+def _cmd_autostart(args) -> int:
+    from .core import autostart  # noqa: PLC0415
+
+    if args.action == "enable":
+        path = autostart.enable()
+        print(json.dumps({"status": "ok", "autostart": True, "plist": str(path)},
+                         ensure_ascii=False))
+    elif args.action == "disable":
+        autostart.disable()
+        print(json.dumps({"status": "ok", "autostart": False}, ensure_ascii=False))
+    else:  # status
+        print(json.dumps({"autostart": autostart.is_enabled(),
+                          "plist": str(autostart.plist_path())}, ensure_ascii=False))
+    return 0
+
+
 def _cmd_capture_analyze(args) -> int:
     from .server.app import capture_and_analyze  # noqa: PLC0415
 
@@ -233,6 +249,11 @@ def main(argv: list[str] | None = None) -> int:
         "원인이 될 만한 CSS/스타일 영역과 함께 설명해 줘."))
     p_an.add_argument("--backend", help="provider id (미지정 시 기본값)")
     p_an.set_defaults(func=_cmd_analyze)
+
+    p_as = sub.add_parser("autostart", help="로그인 시 자동 시작 (LaunchAgent)")
+    p_as.add_argument("action", choices=["enable", "disable", "status"], nargs="?",
+                      default="status")
+    p_as.set_defaults(func=_cmd_autostart)
 
     p_ca = sub.add_parser("capture-analyze", help="캡처 후 분석")
     p_ca.add_argument("--target", default="monitor",
