@@ -18,6 +18,23 @@ def is_main_thread() -> bool:
     return threading.current_thread() is threading.main_thread()
 
 
+def post_to_main(func: Callable[[], object]) -> None:
+    """Schedule `func` on the main run loop without waiting (fire-and-forget).
+
+    Use for UI that may stay open arbitrarily long (e.g. a modal dialog), where
+    waiting on the worker thread would be wrong.
+    """
+    if is_main_thread():
+        func()
+        return
+    try:
+        from PyObjCTools import AppHelper  # noqa: PLC0415
+    except ImportError:
+        func()
+        return
+    AppHelper.callAfter(func)
+
+
 def run_on_main(func: Callable[[], T], timeout: float = 30.0) -> T:
     if is_main_thread():
         return func()

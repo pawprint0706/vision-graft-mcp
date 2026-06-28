@@ -9,6 +9,7 @@ own captures via core.mainthread (plan §2.4.2).
 
 from __future__ import annotations
 
+import json
 import threading
 from pathlib import Path
 
@@ -16,7 +17,7 @@ from ..core import clipboard, credentials
 from ..core import config as cfg
 from ..core.capture_service import perform_capture, register_image
 from ..core.environment import EnvironmentChecker
-from ..core.mainthread import run_on_main
+from ..core.mainthread import post_to_main, run_on_main
 from ..core.models import ProviderConfig
 from ..server import host
 
@@ -278,14 +279,26 @@ def _make_app_class():
                 res = run_analysis(Path(image), (
                     "현재 UI에서 겹치거나 깨진 부분, 정렬 불량, 요소 가려짐/잘림을 찾아 "
                     "원인이 될 만한 CSS/스타일 영역과 함께 설명해 줘."), None)
-                if res.get("status") == "ok":
-                    summary = res["report"].get("summary") or "(요약 없음)"
-                    _notify("분석 완료", summary[:200])
-                else:
-                    _notify("분석 실패", res.get("message", res.get("error_code", "오류")))
+                text = json.dumps(res, ensure_ascii=False, indent=2)
+                post_to_main(lambda: self._show_result(res, text))
 
             _notify("분석 시작", Path(image).name)
             threading.Thread(target=worker, daemon=True).start()
+
+        def _show_result(self, res: dict, text: str) -> None:
+            status = res.get("status", "?")
+            win = rumps.Window(
+                message=f"분석 결과 (status: {status}). 아래는 원본 출력(JSON)입니다.",
+                title="VGMCP 분석 결과",
+                default_text=text,
+                ok="닫기",
+                dimensions=(540, 360),
+            )
+            win.add_button("클립보드에 복사")
+            resp = win.run()
+            if resp.clicked == 2:  # the extra "클립보드에 복사" button
+                ok = clipboard.copy_to_clipboard(resp.text or text)
+                _notify("클립보드 복사", "복사했습니다." if ok else "복사 실패")
 
         def _confirm_consent(self, provider) -> bool:
             resp = rumps.alert(
