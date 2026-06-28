@@ -20,6 +20,10 @@ class CaptureBackend(Protocol):
 
     def capture_window(self, window_id: int, dest: Path) -> CaptureResult: ...
 
+    def find_window(self, app_name: str | None, title_contains: str | None) -> int | None:
+        """Resolve a window_id from a human-friendly selector (plan §6.4)."""
+        ...
+
     def capture_region(self, x: int, y: int, w: int, h: int, dest: Path) -> CaptureResult:
         """Capture a rectangular region (pixels, primary-display top-left origin)."""
         ...

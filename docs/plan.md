@@ -367,6 +367,7 @@ class CaptureBackend(Protocol):
 - `AppKit.NSWorkspace`: 앱→PID/이름 매핑(메뉴 표기·`window_selector` 매칭 보조).
 - SCK 콜백/async API는 세마포어 기반 동기 래퍼로 감싸 `CaptureBackend` 동기 인터페이스에 맞춘다.
 - **deprecated API 사용 금지**: `CGWindowListCreateImage`/`CGDisplayStream`은 macOS 15.0 obsolete이므로 사용하지 않는다.
+- **윈도우-서버 초기화**: 윈도우 단위 필터(`SCContentFilter(desktopIndependentWindow:)`)는 CoreGraphics 윈도우-서버 연결을 요구한다. 베어 CLI 프로세스는 이 연결이 없어 `CGS_REQUIRE_INIT` assertion으로 죽으므로, 캡처 전에 `NSApplication.sharedApplication()`을 1회 호출(idempotent)해 연결을 확립한다(트레이앱의 rumps 루프는 이미 이를 수행). 모니터/디스플레이 캡처는 이 요구가 없다.
 
 ### 6.3 Windows 구현
 - `win32gui.EnumWindows` + `GetWindowText`/`GetWindowRect`: 윈도우 열거.

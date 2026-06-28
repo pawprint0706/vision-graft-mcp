@@ -82,6 +82,32 @@ def _timestamp() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
 
 
+_app_initialized = False
+
+
+def _ensure_app() -> None:
+    """Establish the window-server connection (plan §2.4.2).
+
+    Per-window ScreenCaptureKit filters (SCContentFilter desktopIndependentWindow)
+    require an initialized CoreGraphics/window-server connection, which a bare
+    CLI process lacks (raises CGS_REQUIRE_INIT). NSApplication.sharedApplication()
+    establishes it and is idempotent. The tray app's rumps loop already does this.
+    """
+    global _app_initialized
+    if _app_initialized:
+        return
+    import AppKit  # noqa: PLC0415
+
+    AppKit.NSApplication.sharedApplication()
+    _app_initialized = True
+
+
+def _safe_name(name: str) -> str:
+    """Normalize an app name to a filesystem-safe token (plan §4.2.2)."""
+    cleaned = "".join(c if c.isalnum() or c in "-_" else "_" for c in name).strip("_")
+    return cleaned or "window"
+
+
 class MacOSCaptureBackend:
     """ScreenCaptureKit-based capture (plan §6.2)."""
 
@@ -111,8 +137,51 @@ class MacOSCaptureBackend:
             )
         return monitors
 
-    def list_windows(self) -> list[WindowInfo]:  # noqa: D102 — M3
-        raise NotImplementedError("list_windows lands in M3")
+    def _windows(self):
+        content = _shareable_content()
+        if content is None:
+            raise CaptureError("공유 가능한 화면 콘텐츠를 가져오지 못했습니다(권한 확인).")
+        return list(content.windows())
+
+    def list_windows(self) -> list[WindowInfo]:
+        _ensure_app()
+        from ..core.models import WindowBounds  # noqa: PLC0415
+
+        out: list[WindowInfo] = []
+        for win in self._windows():
+            if not win.isOnScreen():
+                continue
+            app = win.owningApplication()
+            app_name = app.applicationName() if app is not None else ""
+            if not app_name:
+                continue
+            frame = win.frame()
+            w = int(frame.size.width)
+            h = int(frame.size.height)
+            if w <= 1 or h <= 1:
+                continue
+            out.append(
+                WindowInfo(
+                    window_id=int(win.windowID()),
+                    app_name=str(app_name),
+                    title=str(win.title() or ""),
+                    pid=int(app.processID()) if app is not None else None,
+                    bounds=WindowBounds(x=int(frame.origin.x), y=int(frame.origin.y), w=w, h=h),
+                    on_screen=True,
+                )
+            )
+        out.sort(key=lambda wi: (wi.app_name.lower(), wi.title.lower()))
+        return out
+
+    def find_window(self, app_name: str | None, title_contains: str | None) -> int | None:
+        """Resolve a window_id from a human-friendly selector (plan §6.4)."""
+        for wi in self.list_windows():
+            if app_name and app_name.lower() not in wi.app_name.lower():
+                continue
+            if title_contains and title_contains.lower() not in wi.title.lower():
+                continue
+            return wi.window_id
+        return None
 
     def capture_monitor(self, index: int, dest: Path) -> CaptureResult:
         import Quartz  # noqa: PLC0415, F401 — must load CGImage metadata before capture
@@ -144,8 +213,37 @@ class MacOSCaptureBackend:
         width, height = _cgimage_to_png(cgimage, path)
         return CaptureResult(path=str(path), width=width, height=height, source=f"monitor{index}")
 
-    def capture_window(self, window_id: int, dest: Path) -> CaptureResult:  # noqa: D102 — M3
-        raise NotImplementedError("capture_window lands in M3")
+    def capture_window(self, window_id: int, dest: Path) -> CaptureResult:
+        import Quartz  # noqa: PLC0415, F401 — load CGImage metadata before capture
+        import ScreenCaptureKit as SCK  # noqa: PLC0415
+
+        _ensure_app()
+        scwin = next((w for w in self._windows() if int(w.windowID()) == window_id), None)
+        if scwin is None:
+            raise CaptureError(f"윈도우를 찾을 수 없습니다: window_id={window_id}")
+
+        content_filter = SCK.SCContentFilter.alloc().initWithDesktopIndependentWindow_(scwin)
+        # contentRect (points) * pointPixelScale -> full-resolution pixel size.
+        scale = float(content_filter.pointPixelScale())
+        rect = content_filter.contentRect()
+        config = SCK.SCStreamConfiguration.alloc().init()
+        config.setWidth_(max(1, int(rect.size.width * scale)))
+        config.setHeight_(max(1, int(rect.size.height * scale)))
+
+        cgimage = _run_sync(
+            lambda h: SCK.SCScreenshotManager.captureImageWithFilter_configuration_completionHandler_(
+                content_filter, config, h
+            )
+        )
+        if cgimage is None:
+            raise CaptureError("윈도우 캡처 결과 이미지가 비어 있습니다.")
+
+        app = scwin.owningApplication()
+        app_name = app.applicationName() if app is not None else "window"
+        dest.mkdir(parents=True, exist_ok=True)
+        path = dest / f"{_safe_name(app_name)}_{_timestamp()}.png"
+        width, height = _cgimage_to_png(cgimage, path)
+        return CaptureResult(path=str(path), width=width, height=height, source=str(app_name))
 
     def capture_region(self, x: int, y: int, w: int, h: int, dest: Path) -> CaptureResult:
         """Programmatic region capture: full primary capture cropped to the rect.

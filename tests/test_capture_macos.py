@@ -76,3 +76,41 @@ def test_capture_region_bad_size(backend, tmp_path):
 
     with pytest.raises(CaptureError):
         backend.capture_region(0, 0, 0, 100, tmp_path)
+
+
+def test_list_windows(backend):
+    windows = backend.list_windows()
+    assert len(windows) >= 1
+    w = windows[0]
+    assert w.window_id > 0
+    assert w.app_name  # filtered to windows with an owning app
+    assert w.bounds is not None and w.bounds.w > 1 and w.bounds.h > 1
+
+
+def test_capture_window(backend, tmp_path):
+    from pathlib import Path
+
+    from PIL import Image
+
+    windows = backend.list_windows()
+    target = next((w for w in windows if w.title and w.bounds.w > 100), windows[0])
+    result = backend.capture_window(target.window_id, tmp_path)
+    assert result.status == "ok"
+    p = Path(result.path)
+    assert p.exists()
+    with Image.open(p) as im:
+        assert im.size == (result.width, result.height)
+
+
+def test_capture_window_bad_id(backend, tmp_path):
+    from vgmcp.core.errors import CaptureError
+
+    with pytest.raises(CaptureError):
+        backend.capture_window(999_999_999, tmp_path)
+
+
+def test_find_window(backend):
+    windows = backend.list_windows()
+    target = next((w for w in windows if w.title), windows[0])
+    assert backend.find_window(target.app_name, None) is not None
+    assert backend.find_window("NoSuchApp__zzz", None) is None

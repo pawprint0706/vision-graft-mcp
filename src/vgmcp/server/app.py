@@ -83,6 +83,8 @@ def take_screenshot(
     target: str = "monitor",
     monitor_index: int = 0,
     window_id: int | None = None,
+    app_name: str | None = None,
+    title_contains: str | None = None,
     x: int | None = None,
     y: int | None = None,
     w: int | None = None,
@@ -92,7 +94,7 @@ def take_screenshot(
 
     target:
       - 'monitor'            : 모니터 전체화면 (monitor_index)
-      - 'window'             : 특정 윈도우 (window_id)
+      - 'window'             : 특정 윈도우 (window_id, 또는 app_name/title_contains 셀렉터)
       - 'region'             : 좌표 영역 (x, y, w, h; 주 디스플레이 좌상단 기준 픽셀)
       - 'region_interactive' : 사용자가 마우스로 사각형 영역을 드래그 선택 (사용자 조작 필요)
 
@@ -110,8 +112,18 @@ def take_screenshot(
     dest = Path(config.target_folder)
     try:
         if target == "window":
+            if window_id is None and (app_name or title_contains):
+                window_id = backend.find_window(app_name, title_contains)
+                if window_id is None:
+                    return {
+                        "status": "error",
+                        "message": "셀렉터에 맞는 윈도우를 찾지 못했습니다. list_windows로 확인하십시오.",
+                    }
             if window_id is None:
-                return {"status": "error", "message": "target='window'에는 window_id가 필요합니다."}
+                return {
+                    "status": "error",
+                    "message": "target='window'에는 window_id 또는 app_name/title_contains가 필요합니다.",
+                }
             result = backend.capture_window(window_id, dest)
         elif target == "region":
             if None in (x, y, w, h):
