@@ -36,12 +36,39 @@ _RECOMMENDED_LABEL = {"anthropic": "claude-sonnet-4-6", "openai": "gpt-4o",
 # --------------------------------------------------------------------------- #
 # Dialog helpers (AppKit)
 # --------------------------------------------------------------------------- #
+def _blank_icon_path() -> str:
+    from ..core import icons  # noqa: PLC0415
+
+    return str(icons.blank_icon())
+
+
+def _hide_alert_icon(alert) -> None:
+    """Replace a dialog's default (Python) app icon with a transparent one."""
+    try:
+        from AppKit import NSImage  # noqa: PLC0415
+
+        img = NSImage.alloc().initByReferencingFile_(_blank_icon_path())
+        if img is not None:
+            alert.setIcon_(img)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _alert(title: str, message: str, ok: str = "확인", cancel=None) -> int:
+    """rumps.alert with the default app icon hidden."""
+    import rumps  # noqa: PLC0415
+
+    return rumps.alert(title=title, message=message, ok=ok, cancel=cancel,
+                       icon_path=_blank_icon_path())
+
+
 def _text_input(message: str, title: str = "VGMCP", default: str = "",
                 secure: bool = False) -> str | None:
     import rumps  # noqa: PLC0415
 
     win = rumps.Window(message=message, title=title, default_text=default,
                        ok="확인", cancel="취소", dimensions=(360, 120), secure=secure)
+    _hide_alert_icon(win._alert)
     resp = win.run()
     return resp.text.strip() if resp.clicked else None
 
@@ -65,6 +92,7 @@ def _choose_from_list(message: str, title: str, options: list[str],
     if 0 <= default_index < len(options):
         popup.selectItemAtIndex_(default_index)
     alert.setAccessoryView_(popup)
+    _hide_alert_icon(alert)
     if alert.runModal() == 1000:  # NSAlertFirstButtonReturn (확인)
         return popup.titleOfSelectedItem()
     return None
@@ -144,9 +172,9 @@ def _make_app_class():
             config = cfg.load_config()
             if config.onboarding_consent_shown:
                 return
-            rumps.alert(
-                title="VGMCP 시작하기",
-                message=(
+            _alert(
+                "VGMCP 시작하기",
+                (
                     "1) 화면 캡처에는 '화면 기록' 권한이 필요합니다: 시스템 설정 > 개인정보 보호 및 "
                     "보안 > 화면 기록에서 허용하세요.\n\n"
                     "2) 클라우드 비전 백엔드(Anthropic/OpenAI/OpenRouter/커스텀)를 쓰면 캡처 이미지가 "
@@ -198,11 +226,7 @@ def _make_app_class():
                 lines.append(f"{mark} {label}" if ok else f"{mark} {label} — {detail}")
             n_fail = sum(1 for _, ok, _ in items if not ok)
             summary = "모든 항목 정상" if n_fail == 0 else f"문제 {n_fail}건 — 위 항목을 확인하세요."
-            rumps.alert(
-                title="환경 재검사 결과",
-                message="\n".join(lines) + f"\n\n종합: {summary}",
-                ok="닫기",
-            )
+            _alert("환경 재검사 결과", "\n".join(lines) + f"\n\n종합: {summary}", ok="닫기")
 
         def _set_status_icon(self, color: str) -> None:
             from ..core import icons  # noqa: PLC0415
@@ -359,6 +383,7 @@ def _make_app_class():
                 dimensions=(540, 360),
             )
             win.add_button("클립보드에 복사")
+            _hide_alert_icon(win._alert)
             resp = win.run()
             if resp.clicked == 2:  # the extra "클립보드에 복사" button
                 ok = clipboard.copy_to_clipboard(resp.text or text)
@@ -366,9 +391,9 @@ def _make_app_class():
                     _notify("복사 실패", "클립보드 복사에 실패했습니다.")
 
         def _confirm_consent(self, provider) -> bool:
-            resp = rumps.alert(
-                title="외부 전송 동의",
-                message=(
+            resp = _alert(
+                "외부 전송 동의",
+                (
                     f"'{provider.label or provider.id}'({provider.type})로 스크린샷이 외부 서버에 "
                     "전송됩니다. 민감한 화면이 포함될 수 있습니다. 계속할까요?\n\n"
                     "(외부 전송 없이 사용하려면 로컬 Ollama 백엔드를 등록하세요.)"
@@ -465,11 +490,8 @@ def _make_app_class():
                     return  # cancelled
                 if config.get_provider(pid) is None:
                     break
-                rumps.alert(
-                    title="중복된 id",
-                    message=f"'{pid}' 는 이미 등록되어 있습니다. 다른 id를 입력하세요.",
-                    ok="다시 입력",
-                )
+                _alert("중복된 id", f"'{pid}' 는 이미 등록되어 있습니다. 다른 id를 입력하세요.",
+                       ok="다시 입력")
             # 3) model: prefill + introduce a recommended model for cloud providers.
             default_model = _RECOMMENDED_MODEL.get(ptype, "")
             if ptype in _RECOMMENDED_LABEL:
