@@ -90,25 +90,33 @@ You'll also need an **API key** from one vision provider (pick one):
 
 ## Step 1 — Install
 
-Copy these lines into Terminal one block at a time.
+**Easiest — double-click the installer.** After cloning or downloading &
+unzipping the project, open the folder in Finder and **double-click
+`install.command`**. A Terminal window runs the installer (it creates an
+isolated Python environment and installs VGMCP). When it prints **"✅ 설치 완료"**,
+you're done.
+
+> If macOS won't run it (right-click only, or "permission denied"): right-click
+> `install.command` → **Open** (then confirm), or in Terminal run
+> `chmod +x install.command && ./install.command`.
+
+**Prefer the Terminal?**
 
 ```bash
-# 1) Download the project (or use your existing copy) and enter the folder
-cd ~/Projects/vision-graft-mcp        # change this path to where the project is
+cd <the project folder>
+./install.command
+```
 
-# 2) Create an isolated Python environment (keeps things tidy)
+**Fully manual (advanced):**
+
+```bash
 python3 -m venv .venv
-
-# 3) Install VGMCP into it
 .venv/bin/pip install -e ".[macos]"
 ```
 
-That's it — installation is done. (The `.venv/bin/` prefix below just means
-"use the version we installed into this folder.")
-
-> **Tip:** to avoid typing `.venv/bin/` every time, run `source .venv/bin/activate`
-> once per Terminal window. Then you can type `vgmcp` directly instead of
-> `.venv/bin/vgmcp`. This guide keeps the full prefix so it always works.
+(The `.venv/bin/` prefix used below just means "use the copy installed into this
+folder". To skip it, run `source .venv/bin/activate` once per Terminal window and
+type `vgmcp` directly.)
 
 ---
 
@@ -196,9 +204,8 @@ When fully set up it says the environment is OK.
 
 ## Step 4 — Start the app
 
-```bash
-.venv/bin/vgmcp
-```
+**Double-click `start.command`** in the project folder — it launches the app in
+the background and you can close the Terminal window. (Or run `.venv/bin/vgmcp`.)
 
 - A small **icon appears in your menu bar** (top-right of the screen).
 - 🟢 green = ready · 🟡 yellow = works but something optional is missing ·
