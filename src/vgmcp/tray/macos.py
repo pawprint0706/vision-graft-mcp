@@ -291,9 +291,7 @@ def _make_app_class():
             result = perform_capture(**kwargs)
             status = result.get("status")
             if status == "ok":
-                extra = " (클립보드 복사됨)" if result.get("clipboard_copied") else ""
-                _notify("캡처 완료", f"{Path(result['path']).name}{extra}")
-                self._refresh_recent_menu()
+                self._refresh_recent_menu()  # success is silent (toast only on failure)
             elif status == "cancelled":
                 pass
             else:
@@ -305,8 +303,7 @@ def _make_app_class():
                 return
             result = register_image(path)
             if result.get("status") == "ok":
-                _notify("이미지 등록", Path(path).name)
-                self._refresh_recent_menu()
+                self._refresh_recent_menu()  # silent on success
             else:
                 _notify("등록 실패", result.get("message", "오류"))
 
@@ -314,7 +311,8 @@ def _make_app_class():
             def cb(_=None) -> None:
                 config = cfg.load_config()
                 ok, _t = clipboard.copy_prompt(path, config.clipboard_template)
-                _notify("클립보드 복사" if ok else "복사 실패", Path(path).name)
+                if not ok:
+                    _notify("복사 실패", Path(path).name)
             return cb
 
         # ---- analysis ----------------------------------------------------- #
@@ -345,7 +343,6 @@ def _make_app_class():
                 text = json.dumps(res, ensure_ascii=False, indent=2)
                 post_to_main(lambda: self._show_result(res, text))
 
-            _notify("분석 시작", Path(image).name)
             threading.Thread(target=worker, daemon=True).start()
 
         def _show_result(self, res: dict, text: str) -> None:
@@ -361,7 +358,8 @@ def _make_app_class():
             resp = win.run()
             if resp.clicked == 2:  # the extra "클립보드에 복사" button
                 ok = clipboard.copy_to_clipboard(resp.text or text)
-                _notify("클립보드 복사", "복사했습니다." if ok else "복사 실패")
+                if not ok:
+                    _notify("복사 실패", "클립보드 복사에 실패했습니다.")
 
         def _confirm_consent(self, provider) -> bool:
             resp = rumps.alert(
@@ -384,7 +382,6 @@ def _make_app_class():
             config = cfg.load_config()
             config.target_folder = path
             cfg.save_config(config)
-            _notify("타겟 폴더 설정", path)
 
         def edit_template(self, _sender=None) -> None:
             config = cfg.load_config()
@@ -395,7 +392,6 @@ def _make_app_class():
                 return
             config.clipboard_template = new or None
             cfg.save_config(config)
-            _notify("템플릿 저장", "완료")
 
         def toggle_autoclip(self, _sender=None) -> None:
             config = cfg.load_config()
@@ -409,11 +405,9 @@ def _make_app_class():
             if autostart.is_enabled():
                 autostart.disable()
                 self.autostart_item.state = 0
-                _notify("자동 시작", "로그인 시 자동 시작 해제됨")
             else:
                 autostart.enable()
                 self.autostart_item.state = 1
-                _notify("자동 시작", "로그인 시 자동 시작 설정됨")
 
         # ---- backend management ------------------------------------------- #
         def _make_setdefault_cb(self, pid: str):
@@ -422,7 +416,6 @@ def _make_app_class():
                 config.default_provider_id = pid
                 cfg.save_config(config)
                 self._refresh_backend_menu()
-                _notify("기본 백엔드 변경", pid)
             return cb
 
         def _make_consent_cb(self, pid: str, grant: bool):
@@ -431,7 +424,6 @@ def _make_app_class():
                 config.set_consent(pid, grant)
                 cfg.save_config(config)
                 self._refresh_backend_menu()
-                _notify("외부 전송 동의", f"{pid}: {'동의함' if grant else '해제됨'}")
             return cb
 
         def _make_removeprovider_cb(self, pid: str):
@@ -443,7 +435,6 @@ def _make_app_class():
                 config.remove_provider(pid)
                 cfg.save_config(config)
                 self._refresh_backend_menu()
-                _notify("백엔드 삭제", pid)
             return cb
 
         def add_provider(self, _sender=None) -> None:
@@ -492,7 +483,6 @@ def _make_app_class():
                 id=pid, type=ptype, label=pid, model=model, base_url=base_url, key_ref=key_ref))
             cfg.save_config(config)
             self._refresh_backend_menu()
-            _notify("백엔드 추가", pid)
 
     return VGMCPApp
 
