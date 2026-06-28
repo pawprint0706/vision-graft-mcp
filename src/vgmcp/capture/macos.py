@@ -38,9 +38,9 @@ class MacOSCaptureBackend:
         deprecated in 15.1 — plan §9.1 — so we don't rely on it.)
         """
         try:
-            import ScreenCaptureKit as SCK  # noqa: PLC0415, N813
-            from Foundation import NSObject  # noqa: PLC0415
             import threading  # noqa: PLC0415
+
+            import ScreenCaptureKit as SCK  # noqa: PLC0415, N813
 
             result: dict[str, object] = {}
             done = threading.Event()
