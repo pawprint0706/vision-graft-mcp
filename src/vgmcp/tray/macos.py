@@ -82,7 +82,7 @@ def _make_app_class():
                 rumps.MenuItem("클립보드 템플릿 편집...", callback=self.edit_template),
                 self.autoclip_item,
                 self.autostart_item,
-                rumps.MenuItem("환경 재검사", callback=lambda _=None: self.refresh()),
+                rumps.MenuItem("환경 재검사", callback=self.recheck),
             ])
             self.menu = [
                 self.cap_menu,
@@ -142,6 +142,22 @@ def _make_app_class():
             else:
                 color = "red"
             self._set_status_icon(color)
+
+        def recheck(self, _sender=None) -> None:
+            """Re-run the environment check, update the icon, and show a detailed dialog."""
+            self.refresh()
+            items = self.checker.detailed()
+            lines = []
+            for label, ok, detail in items:
+                mark = "✅" if ok else "❌"
+                lines.append(f"{mark} {label}" if ok else f"{mark} {label} — {detail}")
+            n_fail = sum(1 for _, ok, _ in items if not ok)
+            summary = "모든 항목 정상" if n_fail == 0 else f"문제 {n_fail}건 — 위 항목을 확인하세요."
+            rumps.alert(
+                title="환경 재검사 결과",
+                message="\n".join(lines) + f"\n\n종합: {summary}",
+                ok="닫기",
+            )
 
         def _set_status_icon(self, color: str) -> None:
             from ..core import icons  # noqa: PLC0415

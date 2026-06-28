@@ -143,13 +143,13 @@ class EnvironmentChecker:
     """Runs environment checks and produces an EnvStatus (plan §3)."""
 
     def __init__(self, config: AppConfig | None = None) -> None:
+        # An explicit config is pinned; otherwise reload fresh on every access so
+        # live edits (e.g. re-adding a provider from the tray) are picked up.
         self._config = config
 
     @property
     def config(self) -> AppConfig:
-        if self._config is None:
-            self._config = load_config()
-        return self._config
+        return self._config if self._config is not None else load_config()
 
     def check_full(self) -> EnvStatus:
         """Full sweep — tray startup (plan §3.2.1.1)."""
@@ -169,6 +169,26 @@ class EnvironmentChecker:
         issues += _check_capture_permission()
         issues += _check_target_folder(self.config)
         return _status(issues)
+
+    def detailed(self) -> list[tuple[str, bool, str]]:
+        """Per-item pass/fail report for the full check (plan §3.2.2).
+
+        Returns a list of (label, ok, detail) for display in a dialog.
+        """
+        config = self.config
+        report: list[tuple[str, bool, str]] = []
+
+        def add(label: str, issues: list[EnvIssue]) -> None:
+            ok = not issues
+            detail = "정상" if ok else "; ".join(i.reason for i in issues)
+            report.append((label, ok, detail))
+
+        add("Python ≥ 3.11", _check_python())
+        add("캡처 패키지", _check_capture_packages())
+        add("화면 기록 권한", _check_capture_permission())
+        add("비전 백엔드 자격증명", _check_default_credential(config))
+        add("타겟 폴더 쓰기 가능", _check_target_folder(config))
+        return report
 
     def check_for_vision(self, provider_id: str | None = None) -> EnvStatus:
         """Lazy check before analyze_vision (plan §3.2.1.2)."""
