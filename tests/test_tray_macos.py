@@ -39,7 +39,7 @@ def test_top_menu(app):
     assert "캡처" in keys
     assert "설정" in keys
     assert "최근 이미지" in keys
-    assert "마지막 이미지 분석" in keys
+    assert any(k.startswith("마지막 이미지 분석") for k in keys)
 
 
 def test_status_item_is_first(app):

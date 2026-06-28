@@ -94,7 +94,7 @@ def _make_app_class():
                 self.status_item,
                 None,
                 self.cap_menu,
-                rumps.MenuItem("마지막 이미지 분석", callback=self.analyze_last),
+                rumps.MenuItem("마지막 이미지 분석 (테스트)", callback=self.analyze_last),
                 None,
                 settings,
                 self.recent_menu,
