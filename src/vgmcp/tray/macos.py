@@ -112,6 +112,8 @@ def _make_app_class():
             self.recent_menu = rumps.MenuItem("최근 이미지")
             self.backend_menu = rumps.MenuItem("비전 백엔드 관리")
             self.autoclip_item = rumps.MenuItem("자동 클립보드 복사", callback=self.toggle_autoclip)
+            self.copyorig_item = rumps.MenuItem("이미지 열기 시 타겟 폴더로 복사",
+                                                callback=self.toggle_copyorig)
             self.autostart_item = rumps.MenuItem("로그인 시 자동 시작", callback=self.toggle_autostart)
             settings = rumps.MenuItem("설정")
             settings.update([
@@ -119,6 +121,7 @@ def _make_app_class():
                 self.backend_menu,
                 rumps.MenuItem("클립보드 템플릿 편집...", callback=self.edit_template),
                 self.autoclip_item,
+                self.copyorig_item,
                 self.autostart_item,
             ])
             self.menu = [
@@ -167,6 +170,7 @@ def _make_app_class():
                 self._refresh_backend_menu()
                 config = cfg.load_config()
                 self.autoclip_item.state = 1 if config.clipboard_auto else 0
+                self.copyorig_item.state = 1 if config.copy_original else 0
                 from ..core import autostart  # noqa: PLC0415
 
                 self.autostart_item.state = 1 if autostart.is_enabled() else 0
@@ -398,6 +402,12 @@ def _make_app_class():
             config.clipboard_auto = not config.clipboard_auto
             cfg.save_config(config)
             self.autoclip_item.state = 1 if config.clipboard_auto else 0
+
+        def toggle_copyorig(self, _sender=None) -> None:
+            config = cfg.load_config()
+            config.copy_original = not config.copy_original
+            cfg.save_config(config)
+            self.copyorig_item.state = 1 if config.copy_original else 0
 
         def toggle_autostart(self, _sender=None) -> None:
             from ..core import autostart  # noqa: PLC0415

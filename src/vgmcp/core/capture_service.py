@@ -79,7 +79,12 @@ def perform_capture(
 
 
 def register_image(path: str, *, copy_clipboard: bool | None = None) -> dict[str, Any]:
-    """Register an externally-provided image (e.g. 'open image file', plan §4.2.3)."""
+    """Register an externally-provided image (e.g. 'open image file', plan §4.2.3).
+
+    If `copy_original` is set, the file is copied into the target folder (so it's
+    managed alongside captures and survives the original being moved/deleted);
+    otherwise the original path is referenced as-is.
+    """
     from .models import CaptureResult  # noqa: PLC0415
 
     p = Path(path)
@@ -92,8 +97,25 @@ def register_image(path: str, *, copy_clipboard: bool | None = None) -> dict[str
             width, height = im.size
     except Exception as exc:  # noqa: BLE001
         return {"status": "error", "message": f"이미지를 열 수 없습니다: {exc}"}
-    result = CaptureResult(path=str(p), width=width, height=height, source="file")
-    return _post_capture(result, cfg.load_config(), copy_clipboard)
+
+    config = cfg.load_config()
+    dest_path = p
+    target = Path(config.target_folder)
+    if config.copy_original and p.resolve().parent != target.resolve():
+        import shutil  # noqa: PLC0415
+        from datetime import datetime  # noqa: PLC0415
+
+        target.mkdir(parents=True, exist_ok=True)
+        stem = "".join(c if c.isalnum() or c in "-_" else "_" for c in p.stem).strip("_") or "image"
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+        dest_path = target / f"opened_{stem}_{ts}{p.suffix.lower()}"
+        try:
+            shutil.copy2(p, dest_path)
+        except OSError as exc:
+            return {"status": "error", "message": f"타겟 폴더로 복사 실패: {exc}"}
+
+    result = CaptureResult(path=str(dest_path), width=width, height=height, source="file")
+    return _post_capture(result, config, copy_clipboard)
 
 
 def _post_capture(result, config, copy_clipboard: bool | None) -> dict[str, Any]:
