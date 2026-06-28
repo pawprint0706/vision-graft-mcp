@@ -372,6 +372,8 @@ Install Python from [python.org/downloads](https://www.python.org/downloads/).
 .venv/bin/ruff check src/ tests/   # lint
 ```
 
+- **Language:** the app, installer, and launcher show **Korean if the OS prefers
+  Korean, otherwise English**. Force it with `VGMCP_LANG=ko` or `VGMCP_LANG=en`.
 - **Custom tray icon:** the menu-bar icon is generated from a single SVG at
   `src/vgmcp/assets/aperture.svg`. Replace that file with your own line-art SVG
   (keep `stroke="#000000"` so recoloring works) — VGMCP renders three states

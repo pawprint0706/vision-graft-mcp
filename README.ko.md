@@ -368,6 +368,9 @@ Ollama를 실행(`ollama serve`)하고 모델을 받았는지 확인하세요
 .venv/bin/ruff check src/ tests/   # 린트
 ```
 
+- **언어:** 앱·설치 스크립트·실행 스크립트는 **OS 기본 언어가 한국어면 한국어,
+  그 외에는 영어**로 표시됩니다. `VGMCP_LANG=ko` 또는 `VGMCP_LANG=en`으로 강제할
+  수 있습니다.
 - **트레이 아이콘 교체:** 메뉴바 아이콘은 `src/vgmcp/assets/aperture.svg` 하나의
   SVG에서 생성됩니다. 이 파일을 원하는 라인아트 SVG로 바꾸면 됩니다
   (`stroke="#000000"`를 유지해야 재색칠이 동작). VGMCP는 여기서 3개 상태를

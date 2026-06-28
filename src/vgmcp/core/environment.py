@@ -175,19 +175,22 @@ class EnvironmentChecker:
 
         Returns a list of (label, ok, detail) for display in a dialog.
         """
+        from .i18n import tr  # noqa: PLC0415
+
         config = self.config
         report: list[tuple[str, bool, str]] = []
 
         def add(label: str, issues: list[EnvIssue]) -> None:
             ok = not issues
-            detail = "정상" if ok else "; ".join(i.reason for i in issues)
+            detail = tr("정상", "OK") if ok else "; ".join(i.reason for i in issues)
             report.append((label, ok, detail))
 
         add("Python ≥ 3.11", _check_python())
-        add("캡처 패키지", _check_capture_packages())
-        add("화면 기록 권한", _check_capture_permission())
-        add("비전 백엔드 자격증명", _check_default_credential(config))
-        add("타겟 폴더 쓰기 가능", _check_target_folder(config))
+        add(tr("캡처 패키지", "Capture packages"), _check_capture_packages())
+        add(tr("화면 기록 권한", "Screen Recording permission"), _check_capture_permission())
+        add(tr("비전 백엔드 자격증명", "Vision backend credential"),
+            _check_default_credential(config))
+        add(tr("타겟 폴더 쓰기 가능", "Target folder writable"), _check_target_folder(config))
         return report
 
     def check_for_vision(self, provider_id: str | None = None) -> EnvStatus:

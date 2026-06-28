@@ -13,6 +13,7 @@ pytestmark = pytest.mark.skipif(sys.platform != "darwin", reason="macOS only")
 @pytest.fixture
 def app(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    monkeypatch.setenv("VGMCP_LANG", "ko")  # deterministic labels for assertions
     pytest.importorskip("rumps")
     from vgmcp.capture import get_capture_backend
 

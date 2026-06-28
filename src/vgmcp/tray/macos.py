@@ -5,6 +5,9 @@ analyze / settings / recent / backend-management from the menu bar. Dynamic
 submenus (monitors, windows, recent, providers) and the status icon refresh on
 a timer. Tray-initiated captures run on the main thread; the host marshals its
 own captures via core.mainthread (plan §2.4.2).
+
+UI strings are localized via core.i18n.tr (Korean if the OS prefers Korean,
+otherwise English).
 """
 
 from __future__ import annotations
@@ -17,6 +20,7 @@ from ..core import clipboard, credentials
 from ..core import config as cfg
 from ..core.capture_service import perform_capture, register_image
 from ..core.environment import EnvironmentChecker
+from ..core.i18n import tr
 from ..core.mainthread import post_to_main, run_on_main
 from ..core.models import ProviderConfig
 from ..server import host
@@ -31,6 +35,14 @@ _RECOMMENDED_MODEL = {"anthropic": "claude-sonnet-4-6", "openai": "gpt-4o",
                       "openrouter": "openai/gpt-4o"}
 _RECOMMENDED_LABEL = {"anthropic": "claude-sonnet-4-6", "openai": "gpt-4o",
                       "openrouter": "openai/gpt-4o"}
+
+# The analysis prompt is localized so the model replies in the user's language.
+_ANALYZE_PROMPT = tr(
+    "현재 UI에서 겹치거나 깨진 부분, 정렬 불량, 요소 가려짐/잘림을 찾아 "
+    "원인이 될 만한 CSS/스타일 영역과 함께 설명해 줘.",
+    "Find overlapping/broken parts, misalignment, and clipped/occluded elements "
+    "in this UI, and explain them along with the likely CSS/style areas to fix.",
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -61,14 +73,14 @@ def _brand_alert_icon(alert) -> None:
         alert.setIcon_(img)
 
 
-def _alert(title: str, message: str, ok: str = "확인", cancel=None) -> int:
+def _alert(title: str, message: str, ok: str | None = None, cancel=None) -> int:
     """A native NSAlert (so we can brand the icon). Returns 1 for ok, 0 for cancel."""
     from AppKit import NSAlert  # noqa: PLC0415
 
     alert = NSAlert.alloc().init()
     alert.setMessageText_(title)
     alert.setInformativeText_(message)
-    alert.addButtonWithTitle_(ok)
+    alert.addButtonWithTitle_(ok or tr("확인", "OK"))
     if cancel:
         alert.addButtonWithTitle_(cancel)
     _brand_alert_icon(alert)
@@ -80,7 +92,8 @@ def _text_input(message: str, title: str = "VGMCP", default: str = "",
     import rumps  # noqa: PLC0415
 
     win = rumps.Window(message=message, title=title, default_text=default,
-                       ok="확인", cancel="취소", dimensions=(360, 120), secure=secure)
+                       ok=tr("확인", "OK"), cancel=tr("취소", "Cancel"),
+                       dimensions=(360, 120), secure=secure)
     _brand_alert_icon(win._alert)
     resp = win.run()
     return resp.text.strip() if resp.clicked else None
@@ -98,15 +111,15 @@ def _choose_from_list(message: str, title: str, options: list[str],
     alert = NSAlert.alloc().init()
     alert.setMessageText_(title)
     alert.setInformativeText_(message)
-    alert.addButtonWithTitle_("확인")
-    alert.addButtonWithTitle_("취소")
+    alert.addButtonWithTitle_(tr("확인", "OK"))
+    alert.addButtonWithTitle_(tr("취소", "Cancel"))
     popup = NSPopUpButton.alloc().initWithFrame_pullsDown_(NSMakeRect(0, 0, 280, 26), False)
     popup.addItemsWithTitles_(list(options))
     if 0 <= default_index < len(options):
         popup.selectItemAtIndex_(default_index)
     alert.setAccessoryView_(popup)
     _brand_alert_icon(alert)
-    if alert.runModal() == 1000:  # NSAlertFirstButtonReturn (확인)
+    if alert.runModal() == 1000:  # NSAlertFirstButtonReturn
         return popup.titleOfSelectedItem()
     return None
 
@@ -140,7 +153,7 @@ def _make_app_class():
 
     class VGMCPApp(rumps.App):
         def __init__(self) -> None:
-            super().__init__("VGMCP", title=None, icon=None, quit_button="종료")
+            super().__init__("VGMCP", title=None, icon=None, quit_button=tr("종료", "Quit"))
             self.checker = EnvironmentChecker()
             # Pre-generate all status icons up front (plan §4.3) — later switches
             # are cached file lookups, never live conversions.
@@ -148,19 +161,25 @@ def _make_app_class():
 
             icons.pregenerate(cfg.load_config().icon_size)
 
-            self.status_item = rumps.MenuItem("상태: 확인 중", callback=self.recheck)
-            self.cap_menu = rumps.MenuItem("캡처")
-            self.recent_menu = rumps.MenuItem("최근 이미지")
-            self.backend_menu = rumps.MenuItem("비전 백엔드 관리")
-            self.autoclip_item = rumps.MenuItem("자동 클립보드 복사", callback=self.toggle_autoclip)
-            self.copyorig_item = rumps.MenuItem("이미지 열기 시 타겟 폴더로 복사",
-                                                callback=self.toggle_copyorig)
-            self.autostart_item = rumps.MenuItem("로그인 시 자동 시작", callback=self.toggle_autostart)
-            settings = rumps.MenuItem("설정")
+            self.status_item = rumps.MenuItem(tr("상태: 확인 중", "Status: checking…"),
+                                              callback=self.recheck)
+            self.cap_menu = rumps.MenuItem(tr("캡처", "Capture"))
+            self.recent_menu = rumps.MenuItem(tr("최근 이미지", "Recent images"))
+            self.backend_menu = rumps.MenuItem(tr("비전 백엔드 관리", "Manage vision backends"))
+            self.autoclip_item = rumps.MenuItem(tr("자동 클립보드 복사", "Auto-copy to clipboard"),
+                                                callback=self.toggle_autoclip)
+            self.copyorig_item = rumps.MenuItem(
+                tr("이미지 열기 시 타겟 폴더로 복사", "Copy opened images to target folder"),
+                callback=self.toggle_copyorig)
+            self.autostart_item = rumps.MenuItem(tr("로그인 시 자동 시작", "Start at login"),
+                                                 callback=self.toggle_autostart)
+            settings = rumps.MenuItem(tr("설정", "Settings"))
             settings.update([
-                rumps.MenuItem("타겟 폴더 설정...", callback=self.set_target_folder),
+                rumps.MenuItem(tr("타겟 폴더 설정...", "Set target folder…"),
+                               callback=self.set_target_folder),
                 self.backend_menu,
-                rumps.MenuItem("클립보드 템플릿 편집...", callback=self.edit_template),
+                rumps.MenuItem(tr("클립보드 템플릿 편집...", "Edit clipboard template…"),
+                               callback=self.edit_template),
                 self.autoclip_item,
                 self.copyorig_item,
                 self.autostart_item,
@@ -169,10 +188,11 @@ def _make_app_class():
                 self.status_item,
                 None,
                 self.cap_menu,
-                rumps.MenuItem("이미지 파일 열기", callback=self.open_image),
+                rumps.MenuItem(tr("이미지 파일 열기", "Open image file"), callback=self.open_image),
                 self.recent_menu,
                 None,
-                rumps.MenuItem("마지막 이미지 분석 (테스트)", callback=self.analyze_last),
+                rumps.MenuItem(tr("마지막 이미지 분석 (테스트)", "Analyze last image (test)"),
+                               callback=self.analyze_last),
                 settings,
                 None,
             ]
@@ -186,15 +206,20 @@ def _make_app_class():
             if config.onboarding_consent_shown:
                 return
             _alert(
-                "VGMCP 시작하기",
-                (
+                tr("VGMCP 시작하기", "Getting started with VGMCP"),
+                tr(
                     "1) 화면 캡처에는 '화면 기록' 권한이 필요합니다: 시스템 설정 > 개인정보 보호 및 "
                     "보안 > 화면 기록에서 허용하세요.\n\n"
                     "2) 클라우드 비전 백엔드(Anthropic/OpenAI/OpenRouter/커스텀)를 쓰면 캡처 이미지가 "
                     "외부 서버로 전송됩니다. 각 백엔드 최초 사용 시 동의를 묻습니다.\n\n"
-                    "3) 외부 전송 없이 쓰려면 로컬 Ollama 백엔드를 등록하세요."
+                    "3) 외부 전송 없이 쓰려면 로컬 Ollama 백엔드를 등록하세요.",
+                    "1) Screen capture needs 'Screen Recording' permission: System Settings > "
+                    "Privacy & Security > Screen Recording.\n\n"
+                    "2) Cloud vision backends (Anthropic/OpenAI/OpenRouter/custom) send the "
+                    "captured image to an external server. You'll be asked to consent on first "
+                    "use of each backend.\n\n"
+                    "3) To keep everything local, register the Ollama backend.",
                 ),
-                ok="확인",
             )
             config.onboarding_consent_shown = True
             cfg.save_config(config)
@@ -227,7 +252,9 @@ def _make_app_class():
             else:
                 color = "red"
             self._set_status_icon(color)
-            self.status_item.title = "상태: 정상" if color == "green" else "상태: 조치 필요"
+            self.status_item.title = (
+                tr("상태: 정상", "Status: OK") if color == "green"
+                else tr("상태: 조치 필요", "Status: action needed"))
 
         def recheck(self, _sender=None) -> None:
             """Re-run the environment check, update the icon, and show a detailed dialog."""
@@ -238,8 +265,12 @@ def _make_app_class():
                 mark = "✅" if ok else "❌"
                 lines.append(f"{mark} {label}" if ok else f"{mark} {label} — {detail}")
             n_fail = sum(1 for _, ok, _ in items if not ok)
-            summary = "모든 항목 정상" if n_fail == 0 else f"문제 {n_fail}건 — 위 항목을 확인하세요."
-            _alert("환경 재검사 결과", "\n".join(lines) + f"\n\n종합: {summary}", ok="닫기")
+            summary = (tr("모든 항목 정상", "All checks passed") if n_fail == 0
+                       else tr(f"문제 {n_fail}건 — 위 항목을 확인하세요.",
+                               f"{n_fail} issue(s) — see the items above."))
+            _alert(tr("환경 재검사 결과", "Environment check"),
+                   "\n".join(lines) + "\n\n" + tr("종합: ", "Summary: ") + summary,
+                   ok=tr("닫기", "Close"))
 
         def _set_status_icon(self, color: str) -> None:
             from ..core import icons  # noqa: PLC0415
@@ -265,12 +296,13 @@ def _make_app_class():
             if backend is not None:
                 try:
                     for m in backend.list_monitors():
-                        label = f"모니터 {m.index} ({m.width}×{m.height})"
+                        label = tr(f"모니터 {m.index} ({m.width}×{m.height})",
+                                   f"Monitor {m.index} ({m.width}×{m.height})")
                         items.append(rumps.MenuItem(
                             label, callback=self._make_monitor_cb(m.index)))
                 except Exception:  # noqa: BLE001
                     pass
-                wins_parent = rumps.MenuItem("앱 창 선택 캡처")
+                wins_parent = rumps.MenuItem(tr("앱 창 선택 캡처", "Capture an app window"))
                 try:
                     wins = backend.list_windows()[:_MAX_WINDOWS]
                     for wi in wins:
@@ -280,17 +312,20 @@ def _make_app_class():
                 except Exception:  # noqa: BLE001
                     pass
                 items.append(wins_parent)
-            items.append(rumps.MenuItem("영역 선택 캡처 (드래그)", callback=self.cap_region))
+            items.append(rumps.MenuItem(tr("영역 선택 캡처 (드래그)", "Capture a region (drag)"),
+                                        callback=self.cap_region))
             _set_children(self.cap_menu, items)
 
         def _refresh_recent_menu(self) -> None:
             config = cfg.load_config()
-            items = [rumps.MenuItem("타겟 폴더 열기", callback=self.open_target_folder)]
+            items = [rumps.MenuItem(tr("타겟 폴더 열기", "Open target folder"),
+                                    callback=self.open_target_folder)]
             recents = [
                 rumps.MenuItem(Path(p).name, callback=self._make_recent_cb(p))
                 for p in config.recent_images
             ]
-            items += recents or [rumps.MenuItem("(최근 이미지 없음)", callback=None)]
+            items += recents or [rumps.MenuItem(tr("(최근 이미지 없음)", "(no recent images)"),
+                                                callback=None)]
             _set_children(self.recent_menu, items)
 
         def open_target_folder(self, _sender=None) -> None:
@@ -307,15 +342,19 @@ def _make_app_class():
             for p in config.providers:
                 mark = "✓ " if p.id == default_id else "   "
                 sub = rumps.MenuItem(f"{mark}{p.id} ({p.type})")
-                sub.add(rumps.MenuItem("기본값으로 설정", callback=self._make_setdefault_cb(p.id)))
+                sub.add(rumps.MenuItem(tr("기본값으로 설정", "Set as default"),
+                                       callback=self._make_setdefault_cb(p.id)))
                 if not p.is_local:
-                    label = "외부 전송 동의 해제" if p.consented else "외부 전송 동의"
+                    label = (tr("외부 전송 동의 해제", "Revoke external-send consent")
+                             if p.consented else tr("외부 전송 동의", "Allow external send"))
                     sub.add(rumps.MenuItem(label, callback=self._make_consent_cb(p.id, not p.consented)))
-                sub.add(rumps.MenuItem("삭제", callback=self._make_removeprovider_cb(p.id)))
+                sub.add(rumps.MenuItem(tr("삭제", "Remove"),
+                                       callback=self._make_removeprovider_cb(p.id)))
                 items.append(sub)
             if not config.providers:
-                items.append(rumps.MenuItem("(등록된 provider 없음)", callback=None))
-            items.append(rumps.MenuItem("추가...", callback=self.add_provider))
+                items.append(rumps.MenuItem(tr("(등록된 provider 없음)", "(no providers registered)"),
+                                            callback=None))
+            items.append(rumps.MenuItem(tr("추가...", "Add…"), callback=self.add_provider))
             _set_children(self.backend_menu, items)
 
         # ---- capture actions ---------------------------------------------- #
@@ -336,7 +375,8 @@ def _make_app_class():
             elif status == "cancelled":
                 pass
             else:
-                _notify("캡처 실패", result.get("message", status or "오류"))
+                _notify(tr("캡처 실패", "Capture failed"),
+                        result.get("message", status or tr("오류", "error")))
 
         def open_image(self, _sender=None) -> None:
             path = _pick_path(directory=False, file_types=["png", "jpg", "jpeg", "webp"])
@@ -346,25 +386,30 @@ def _make_app_class():
             if result.get("status") == "ok":
                 self._refresh_recent_menu()  # silent on success
             else:
-                _notify("등록 실패", result.get("message", "오류"))
+                _notify(tr("등록 실패", "Register failed"),
+                        result.get("message", tr("오류", "error")))
 
         def _make_recent_cb(self, path: str):
             def cb(_=None) -> None:
                 config = cfg.load_config()
                 ok, _t = clipboard.copy_prompt(path, config.clipboard_template)
                 if not ok:
-                    _notify("복사 실패", Path(path).name)
+                    _notify(tr("복사 실패", "Copy failed"), Path(path).name)
             return cb
 
         # ---- analysis ----------------------------------------------------- #
         def analyze_last(self, _sender=None) -> None:
             config = cfg.load_config()
             if not config.recent_images:
-                _notify("분석 불가", "최근 이미지가 없습니다. 먼저 캡처하세요.")
+                _notify(tr("분석 불가", "Can't analyze"),
+                        tr("최근 이미지가 없습니다. 먼저 캡처하세요.",
+                           "No recent image. Capture one first."))
                 return
             provider = config.effective_default()
             if provider is None:
-                _notify("분석 불가", "등록된 비전 백엔드가 없습니다. 설정에서 추가하세요.")
+                _notify(tr("분석 불가", "Can't analyze"),
+                        tr("등록된 비전 백엔드가 없습니다. 설정에서 추가하세요.",
+                           "No vision backend. Add one in Settings."))
                 return
             # External-transmission consent for cloud providers (plan §7.9).
             if not provider.is_local and not provider.consented:
@@ -378,9 +423,7 @@ def _make_app_class():
             def worker() -> None:
                 from ..server.vision_service import run_analysis  # noqa: PLC0415
 
-                res = run_analysis(Path(image), (
-                    "현재 UI에서 겹치거나 깨진 부분, 정렬 불량, 요소 가려짐/잘림을 찾아 "
-                    "원인이 될 만한 CSS/스타일 영역과 함께 설명해 줘."), None)
+                res = run_analysis(Path(image), _ANALYZE_PROMPT, None)
                 text = json.dumps(res, ensure_ascii=False, indent=2)
                 post_to_main(lambda: self._show_result(res, text))
 
@@ -389,30 +432,36 @@ def _make_app_class():
         def _show_result(self, res: dict, text: str) -> None:
             status = res.get("status", "?")
             win = rumps.Window(
-                message=f"분석 결과 (status: {status}). 아래는 원본 출력(JSON)입니다.",
-                title="VGMCP 분석 결과",
+                message=tr(f"분석 결과 (status: {status}). 아래는 원본 출력(JSON)입니다.",
+                           f"Analysis result (status: {status}). Raw output (JSON) below."),
+                title=tr("VGMCP 분석 결과", "VGMCP analysis result"),
                 default_text=text,
-                ok="닫기",
+                ok=tr("닫기", "Close"),
                 dimensions=(540, 360),
             )
-            win.add_button("클립보드에 복사")
+            win.add_button(tr("클립보드에 복사", "Copy to clipboard"))
             _brand_alert_icon(win._alert)
             resp = win.run()
-            if resp.clicked == 2:  # the extra "클립보드에 복사" button
+            if resp.clicked == 2:  # the extra "copy" button
                 ok = clipboard.copy_to_clipboard(resp.text or text)
                 if not ok:
-                    _notify("복사 실패", "클립보드 복사에 실패했습니다.")
+                    _notify(tr("복사 실패", "Copy failed"),
+                            tr("클립보드 복사에 실패했습니다.", "Failed to copy to clipboard."))
 
         def _confirm_consent(self, provider) -> bool:
             resp = _alert(
-                "외부 전송 동의",
-                (
+                tr("외부 전송 동의", "External transmission consent"),
+                tr(
                     f"'{provider.label or provider.id}'({provider.type})로 스크린샷이 외부 서버에 "
                     "전송됩니다. 민감한 화면이 포함될 수 있습니다. 계속할까요?\n\n"
-                    "(외부 전송 없이 사용하려면 로컬 Ollama 백엔드를 등록하세요.)"
+                    "(외부 전송 없이 사용하려면 로컬 Ollama 백엔드를 등록하세요.)",
+                    f"Screenshots will be sent to '{provider.label or provider.id}'"
+                    f"({provider.type}), an external server. They may contain sensitive "
+                    "content. Continue?\n\n"
+                    "(To avoid external transmission, register the local Ollama backend.)",
                 ),
-                ok="동의하고 분석",
-                cancel="취소",
+                ok=tr("동의하고 분석", "Agree & analyze"),
+                cancel=tr("취소", "Cancel"),
             )
             return resp == 1
 
@@ -428,8 +477,10 @@ def _make_app_class():
         def edit_template(self, _sender=None) -> None:
             config = cfg.load_config()
             current = config.clipboard_template or clipboard.DEFAULT_TEMPLATE
-            new = _text_input("클립보드 프롬프트 템플릿 ({image_path}, {filename} 사용 가능)",
-                              "템플릿 편집", current)
+            new = _text_input(
+                tr("클립보드 프롬프트 템플릿 ({image_path}, {filename} 사용 가능)",
+                   "Clipboard prompt template ({image_path}, {filename} available)"),
+                tr("템플릿 편집", "Edit template"), current)
             if new is None:
                 return
             config.clipboard_template = new or None
@@ -486,41 +537,53 @@ def _make_app_class():
             return cb
 
         def add_provider(self, _sender=None) -> None:
+            title = tr("백엔드 추가", "Add backend")
             # 1) provider type: pick from a dropdown (no typing -> no typos).
-            ptype = _choose_from_list("등록할 provider 종류를 선택하세요.", "백엔드 추가",
-                                      _PROVIDER_TYPES)
+            ptype = _choose_from_list(
+                tr("등록할 provider 종류를 선택하세요.", "Choose a provider type."),
+                title, _PROVIDER_TYPES)
             if ptype is None:
                 return
             # 2) unique id: typed, since registering the same type twice needs
-            #    distinct ids (e.g. two openai providers). The id is internal to
-            #    VGMCP only — never sent to the provider. Re-prompt on duplicates.
+            #    distinct ids. The id is internal to VGMCP only — never sent out.
             config = cfg.load_config()
-            prompt = ("provider 고유 id를 입력하세요. (VGMCP 내부 구분용 이름이며 외부로 전송되지 않습니다.)\n"
-                      "같은 종류를 여러 개 등록하려면 서로 다르게 지정하세요.")
+            prompt = tr(
+                "provider 고유 id를 입력하세요. (VGMCP 내부 구분용 이름이며 외부로 전송되지 않습니다.)\n"
+                "같은 종류를 여러 개 등록하려면 서로 다르게 지정하세요.",
+                "Enter a unique provider id. (Internal VGMCP label only — never sent "
+                "externally.)\nUse different ids to register several of the same type.")
             while True:
-                pid = _text_input(prompt, "백엔드 추가", ptype)
+                pid = _text_input(prompt, title, ptype)
                 if not pid:
                     return  # cancelled
                 if config.get_provider(pid) is None:
                     break
-                _alert("중복된 id", f"'{pid}' 는 이미 등록되어 있습니다. 다른 id를 입력하세요.",
-                       ok="다시 입력")
+                _alert(tr("중복된 id", "Duplicate id"),
+                       tr(f"'{pid}' 는 이미 등록되어 있습니다. 다른 id를 입력하세요.",
+                          f"'{pid}' already exists. Enter a different id."),
+                       ok=tr("다시 입력", "Re-enter"))
             # 3) model: prefill + introduce a recommended model for cloud providers.
             default_model = _RECOMMENDED_MODEL.get(ptype, "")
             if ptype in _RECOMMENDED_LABEL:
-                mmsg = f"모델명 (추천: {_RECOMMENDED_LABEL[ptype]}). 비우면 기본값 사용."
+                mmsg = tr(f"모델명 (추천: {_RECOMMENDED_LABEL[ptype]}). 비우면 기본값 사용.",
+                          f"Model name (recommended: {_RECOMMENDED_LABEL[ptype]}). "
+                          "Blank = default.")
             else:
-                mmsg = "모델명 (비우면 기본값 사용)."
-            model = _text_input(mmsg, "백엔드 추가", default_model) or ""
+                mmsg = tr("모델명 (비우면 기본값 사용).", "Model name (blank = default).")
+            model = _text_input(mmsg, title, default_model) or ""
             base_url = None
             if ptype == "custom":
-                base_url = _text_input("base_url (OpenAI 호환 엔드포인트)", "백엔드 추가", "")
+                base_url = _text_input(
+                    tr("base_url (OpenAI 호환 엔드포인트)", "base_url (OpenAI-compatible endpoint)"),
+                    title, "")
                 if not base_url:
-                    _notify("추가 실패", "custom에는 base_url이 필요합니다.")
+                    _notify(tr("추가 실패", "Add failed"),
+                            tr("custom에는 base_url이 필요합니다.", "custom requires a base_url."))
                     return
             key_ref = None
             if ptype != "ollama":
-                key = _text_input("API 키 (비우면 환경변수 사용)", "백엔드 추가", "", secure=True)
+                key = _text_input(tr("API 키 (비우면 환경변수 사용)", "API key (blank = use env var)"),
+                                  title, "", secure=True)
                 if key:
                     key_ref = f"provider:{pid}"
                     credentials.set_key(key_ref, key)
