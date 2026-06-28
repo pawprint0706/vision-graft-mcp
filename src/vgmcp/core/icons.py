@@ -28,6 +28,8 @@ _COLORS = {
 
 DEFAULT_SIZE = 36  # render px; displayed at the menu bar's ~20pt (retina-crisp)
 
+STATES = ("normal", "yellow", "red", "gray")
+
 # Map EnvironmentChecker status colors (plan §4.3) to icon states.
 STATUS_TO_STATE = {"green": "normal", "yellow": "yellow", "red": "red", "gray": "gray"}
 
@@ -106,3 +108,9 @@ def icon_for_status(status_color: str, size: int = DEFAULT_SIZE) -> tuple[Path |
     """Map a status color to (icon_path, is_template)."""
     state = STATUS_TO_STATE.get(status_color, "normal")
     return get_icon(state, size), is_template(state)
+
+
+def pregenerate(size: int = DEFAULT_SIZE) -> dict[str, Path | None]:
+    """Generate all state icons once up front (called at app launch) so switching
+    states later is a cached file lookup, never a live conversion."""
+    return {state: get_icon(state, size) for state in STATES}

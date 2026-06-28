@@ -70,6 +70,13 @@ def _make_app_class():
         def __init__(self) -> None:
             super().__init__("VGMCP", title=None, icon=None, quit_button="종료")
             self.checker = EnvironmentChecker()
+            # Pre-generate all status icons up front (plan §4.3) — later switches
+            # are cached file lookups, never live conversions.
+            from ..core import icons  # noqa: PLC0415
+
+            icons.pregenerate(cfg.load_config().icon_size)
+
+            self.status_item = rumps.MenuItem("상태: 확인 중", callback=self.recheck)
             self.cap_menu = rumps.MenuItem("캡처")
             self.recent_menu = rumps.MenuItem("최근 이미지")
             self.backend_menu = rumps.MenuItem("비전 백엔드 관리")
@@ -82,9 +89,10 @@ def _make_app_class():
                 rumps.MenuItem("클립보드 템플릿 편집...", callback=self.edit_template),
                 self.autoclip_item,
                 self.autostart_item,
-                rumps.MenuItem("환경 재검사", callback=self.recheck),
             ])
             self.menu = [
+                self.status_item,
+                None,
                 self.cap_menu,
                 rumps.MenuItem("마지막 이미지 분석", callback=self.analyze_last),
                 None,
@@ -142,6 +150,7 @@ def _make_app_class():
             else:
                 color = "red"
             self._set_status_icon(color)
+            self.status_item.title = "상태: 정상" if color == "green" else "상태: 조치 필요"
 
         def recheck(self, _sender=None) -> None:
             """Re-run the environment check, update the icon, and show a detailed dialog."""

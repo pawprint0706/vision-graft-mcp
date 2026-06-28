@@ -42,6 +42,19 @@ def test_top_menu(app):
     assert "마지막 이미지 분석" in keys
 
 
+def test_status_item_is_first(app):
+    keys = list(app.menu.keys())
+    status_key = next(k for k in keys if k.startswith("상태"))
+    # Status item sits above 캡처, with a separator between them.
+    assert keys.index(status_key) < keys.index("캡처")
+    assert app.status_item.title.startswith("상태:")
+
+
+def test_recheck_removed_from_settings(app):
+    # '환경 재검사' moved out; recheck now lives on the top status item.
+    assert "환경 재검사" not in list(app.menu["설정"].keys())
+
+
 def test_capture_submenu(app):
     caps = list(app.menu["캡처"].keys())
     assert any("모니터" in k for k in caps)
