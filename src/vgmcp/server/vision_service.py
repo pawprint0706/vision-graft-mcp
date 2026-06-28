@@ -33,6 +33,23 @@ def run_analysis(image_path: Path, prompt: str, backend_id: str | None) -> dict[
             ),
         }
 
+    # External-transmission consent for cloud providers (plan §7.9).
+    if not provider.is_local and not provider.consented:
+        return {
+            "status": "consent_required",
+            "backend": provider.id,
+            "provider_type": provider.type,
+            "message": (
+                f"'{provider.label or provider.id}'({provider.type})로 스크린샷을 외부 전송합니다. "
+                "최초 1회 동의가 필요합니다."
+            ),
+            "next_action": (
+                "사용자에게 외부 전송 동의를 받은 뒤, 트레이 '비전 백엔드 관리'의 해당 provider "
+                f"동의 항목을 켜거나 `vgmcp provider consent {provider.id}`를 실행한 후 재시도하십시오. "
+                "민감 화면이 우려되면 로컬 Ollama 백엔드를 사용할 수 있습니다."
+            ),
+        }
+
     api_key = None
     if not provider.is_local:
         api_key = credentials.get_key(provider.key_ref, provider_type=provider.type)

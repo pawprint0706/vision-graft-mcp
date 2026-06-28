@@ -502,6 +502,12 @@ class VisionBackend(Protocol):
   - 커스텀 `base_url`은 전송 대상이 사용자가 지정한 임의 서버이므로, **커스텀 provider는 등록 시 추가 주의 고지**를 둔다.
 - 민감 화면이 우려되는 사용자를 위해 온보딩·고지에서 **로컬 Ollama 옵션을 동등하게 안내**한다.
 
+#### 7.9.1 동의 게이트 구현 (M5)
+- **enforcement**: `analyze_vision`은 클라우드 provider가 `consented=false`이면 이미지를 전송하지 않고 `status:"consent_required"`(+`backend`·`message`·`next_action`)를 반환한다. AI 모델은 이를 사용자에게 전달하고, 동의 후 재호출한다(§3.3.2와 동일한 협업 루프).
+- **동의 부여 경로**: 트레이 `비전 백엔드 관리 > (provider) > 외부 전송 동의`, 또는 CLI `vgmcp provider consent <id>`(`--revoke`로 철회). 동의는 provider별로 config에 영속.
+- **로컬 예외**: Ollama는 외부 전송이 없으므로 게이트 대상이 아니다.
+- **온보딩(트레이 첫 실행)**: 화면 기록 권한 안내 + 클라우드 외부 전송 고지 + 로컬 대안 안내를 1회 표시(`onboarding_consent_shown` 플래그).
+
 ---
 
 ## 8. 클립보드 프롬프트 서포터

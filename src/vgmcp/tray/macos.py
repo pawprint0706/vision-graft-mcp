@@ -93,6 +93,25 @@ def _make_app_class():
             self.timer = rumps.Timer(lambda _=None: self.refresh(), 5)
             self.timer.start()
 
+        def _maybe_onboard(self) -> None:
+            """First-run notice: permission guidance + privacy (plan §7.9, §9.1)."""
+            config = cfg.load_config()
+            if config.onboarding_consent_shown:
+                return
+            rumps.alert(
+                title="VGMCP 시작하기",
+                message=(
+                    "1) 화면 캡처에는 '화면 기록' 권한이 필요합니다: 시스템 설정 > 개인정보 보호 및 "
+                    "보안 > 화면 기록에서 허용하세요.\n\n"
+                    "2) 클라우드 비전 백엔드(Anthropic/OpenAI/OpenRouter/커스텀)를 쓰면 캡처 이미지가 "
+                    "외부 서버로 전송됩니다. 각 백엔드 최초 사용 시 동의를 묻습니다.\n\n"
+                    "3) 외부 전송 없이 쓰려면 로컬 Ollama 백엔드를 등록하세요."
+                ),
+                ok="확인",
+            )
+            config.onboarding_consent_shown = True
+            cfg.save_config(config)
+
         def stop_timer(self) -> None:
             self.timer.stop()
 
@@ -163,6 +182,9 @@ def _make_app_class():
                 mark = "✓ " if p.id == default_id else "   "
                 sub = rumps.MenuItem(f"{mark}{p.id} ({p.type})")
                 sub.add(rumps.MenuItem("기본값으로 설정", callback=self._make_setdefault_cb(p.id)))
+                if not p.is_local:
+                    label = "외부 전송 동의 해제" if p.consented else "외부 전송 동의"
+                    sub.add(rumps.MenuItem(label, callback=self._make_consent_cb(p.id, not p.consented)))
                 sub.add(rumps.MenuItem("삭제", callback=self._make_removeprovider_cb(p.id)))
                 items.append(sub)
             if not config.providers:
@@ -216,6 +238,17 @@ def _make_app_class():
             if not config.recent_images:
                 _notify("분석 불가", "최근 이미지가 없습니다. 먼저 캡처하세요.")
                 return
+            provider = config.effective_default()
+            if provider is None:
+                _notify("분석 불가", "등록된 비전 백엔드가 없습니다. 설정에서 추가하세요.")
+                return
+            # External-transmission consent for cloud providers (plan §7.9).
+            if not provider.is_local and not provider.consented:
+                if not self._confirm_consent(provider):
+                    return
+                config.set_consent(provider.id, True)
+                cfg.save_config(config)
+                self._refresh_backend_menu()
             image = config.recent_images[0]
 
             def worker() -> None:
@@ -232,6 +265,19 @@ def _make_app_class():
 
             _notify("분석 시작", Path(image).name)
             threading.Thread(target=worker, daemon=True).start()
+
+        def _confirm_consent(self, provider) -> bool:
+            resp = rumps.alert(
+                title="외부 전송 동의",
+                message=(
+                    f"'{provider.label or provider.id}'({provider.type})로 스크린샷이 외부 서버에 "
+                    "전송됩니다. 민감한 화면이 포함될 수 있습니다. 계속할까요?\n\n"
+                    "(외부 전송 없이 사용하려면 로컬 Ollama 백엔드를 등록하세요.)"
+                ),
+                ok="동의하고 분석",
+                cancel="취소",
+            )
+            return resp == 1
 
         # ---- settings ----------------------------------------------------- #
         def set_target_folder(self, _sender=None) -> None:
@@ -268,6 +314,15 @@ def _make_app_class():
                 cfg.save_config(config)
                 self._refresh_backend_menu()
                 _notify("기본 백엔드 변경", pid)
+            return cb
+
+        def _make_consent_cb(self, pid: str, grant: bool):
+            def cb(_=None) -> None:
+                config = cfg.load_config()
+                config.set_consent(pid, grant)
+                cfg.save_config(config)
+                self._refresh_backend_menu()
+                _notify("외부 전송 동의", f"{pid}: {'동의함' if grant else '해제됨'}")
             return cb
 
         def _make_removeprovider_cb(self, pid: str):
@@ -327,7 +382,9 @@ def build_app():
 
 def run_tray() -> None:
     host.start_background()
-    build_app().run()
+    app = build_app()
+    app._maybe_onboard()  # first-run notice (plan §7.9)
+    app.run()
 
 
 def _set_children(parent, children) -> None:

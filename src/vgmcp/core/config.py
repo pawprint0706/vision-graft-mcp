@@ -86,6 +86,14 @@ class AppConfig(BaseModel):
         self.last_used_provider_id = provider_id
         self.default_provider_id = provider_id
 
+    def set_consent(self, provider_id: str, consented: bool) -> bool:
+        """Grant/revoke external-transmission consent for a provider (plan §7.9)."""
+        p = self.get_provider(provider_id)
+        if p is None:
+            return False
+        p.consented = consented
+        return True
+
     def add_recent(self, path: str) -> None:
         """Record a recent image (most-recent first, de-duplicated, capped)."""
         self.recent_images = [path] + [p for p in self.recent_images if p != path]

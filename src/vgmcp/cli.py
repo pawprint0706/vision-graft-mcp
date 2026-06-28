@@ -119,6 +119,17 @@ def _cmd_provider_remove(args) -> int:
     return 0
 
 
+def _cmd_provider_consent(args) -> int:
+    config = cfg.load_config()
+    if not config.set_consent(args.id, not args.revoke):
+        print(f"provider를 찾을 수 없습니다: {args.id}", file=sys.stderr)
+        return 1
+    cfg.save_config(config)
+    print(json.dumps({"status": "ok", "id": args.id,
+                      "consented": not args.revoke}, ensure_ascii=False))
+    return 0
+
+
 def _cmd_provider_list(_args) -> int:
     config = cfg.load_config()
     out = {
@@ -126,7 +137,8 @@ def _cmd_provider_list(_args) -> int:
         "last_used_provider_id": config.last_used_provider_id,
         "providers": [
             {"id": p.id, "type": p.type, "model": p.model, "base_url": p.base_url,
-             "has_key": p.is_local or bool(credentials.get_key(p.key_ref, provider_type=p.type))}
+             "has_key": p.is_local or bool(credentials.get_key(p.key_ref, provider_type=p.type)),
+             "consented": p.is_local or p.consented}
             for p in config.providers
         ],
     }
@@ -196,6 +208,11 @@ def main(argv: list[str] | None = None) -> int:
     p_rm = prov_sub.add_parser("remove", help="provider 삭제 (키체인 키도 삭제)")
     p_rm.add_argument("id")
     p_rm.set_defaults(func=_cmd_provider_remove)
+
+    p_cs = prov_sub.add_parser("consent", help="외부 전송 동의 부여/철회 (§7.9)")
+    p_cs.add_argument("id")
+    p_cs.add_argument("--revoke", action="store_true", help="동의 철회")
+    p_cs.set_defaults(func=_cmd_provider_consent)
 
     prov_sub.add_parser("list", help="등록된 provider 목록").set_defaults(func=_cmd_provider_list)
 
