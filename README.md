@@ -109,8 +109,20 @@ That's it — installation is done. (The `.venv/bin/` prefix below just means
 
 ## Step 2 — Add a vision provider (API key)
 
-Register the provider you chose. Using `--key -` makes the Terminal ask for the
-key with a **hidden prompt**, so your secret never shows on screen or in history.
+You can do this **two ways** — use whichever you prefer:
+
+> **🖱️ Prefer clicking? Use the menu bar (no Terminal needed).**
+> Start the app first ([Step 4](#step-4--start-the-app)), then open the menu-bar
+> icon → **설정 / Settings → 비전 백엔드 관리 / Manage vision backends →
+> 추가… / Add…**. It asks you, one box at a time, for the provider type, a name,
+> the model, (for `custom`) the endpoint URL, and the API key (the key field is
+> masked). Consent is the **외부 전송 동의 / Allow external transmission** item
+> in that same submenu, and you can set the default there too. If you go this
+> route, you can skip the commands below.
+
+**⌨️ Or use the Terminal.** Register the provider you chose. Using `--key -`
+makes the Terminal ask for the key with a **hidden prompt**, so your secret never
+shows on screen or in history.
 
 **OpenRouter (recommended):**
 
