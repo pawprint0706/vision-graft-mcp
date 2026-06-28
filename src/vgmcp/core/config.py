@@ -51,6 +51,10 @@ class AppConfig(BaseModel):
     clipboard_auto: bool = False
     clipboard_template: str | None = None
 
+    # Recent captured/opened images (plan §4.1 "최근 이미지")
+    recent_images: list[str] = Field(default_factory=list)
+    recent_limit: int = 10
+
     # Image preprocessing (plan §7.5)
     max_long_edge: int = 1568
     downscale: str = "auto"  # "auto" | "off"
@@ -81,6 +85,11 @@ class AppConfig(BaseModel):
         """Last-used becomes the effective default going forward (plan §7.3 rule 3)."""
         self.last_used_provider_id = provider_id
         self.default_provider_id = provider_id
+
+    def add_recent(self, path: str) -> None:
+        """Record a recent image (most-recent first, de-duplicated, capped)."""
+        self.recent_images = [path] + [p for p in self.recent_images if p != path]
+        del self.recent_images[self.recent_limit:]
 
     def effective_default(self) -> ProviderConfig | None:
         """Resolve the default provider: last-used wins, else stored default."""

@@ -100,47 +100,16 @@ def take_screenshot(
 
     작은 영역은 분석 시 원본 그대로, 큰 영역은 자동 다운스케일되어 전송된다(§7.5).
     """
-    from ..capture import get_capture_backend  # noqa: PLC0415
+    from ..core.capture_service import perform_capture  # noqa: PLC0415
 
-    env = EnvironmentChecker().check_for_capture()
-    if not env.ok:
-        return env.to_guide()
-    backend = get_capture_backend()
-    if backend is None:
-        return _not_implemented("take_screenshot", "M2")
-    config = cfg.load_config()
-    dest = Path(config.target_folder)
-    try:
-        if target == "window":
-            if window_id is None and (app_name or title_contains):
-                window_id = backend.find_window(app_name, title_contains)
-                if window_id is None:
-                    return {
-                        "status": "error",
-                        "message": "셀렉터에 맞는 윈도우를 찾지 못했습니다. list_windows로 확인하십시오.",
-                    }
-            if window_id is None:
-                return {
-                    "status": "error",
-                    "message": "target='window'에는 window_id 또는 app_name/title_contains가 필요합니다.",
-                }
-            result = backend.capture_window(window_id, dest)
-        elif target == "region":
-            if None in (x, y, w, h):
-                return {
-                    "status": "error",
-                    "message": "target='region'에는 x, y, w, h가 모두 필요합니다.",
-                }
-            result = backend.capture_region(x, y, w, h, dest)
-        elif target == "region_interactive":
-            result = backend.capture_region_interactive(dest)
-            if result is None:
-                return {"status": "cancelled", "message": "사용자가 영역 선택을 취소했습니다."}
-        else:
-            result = backend.capture_monitor(monitor_index, dest)
-    except NotImplementedError:
-        return _not_implemented("take_screenshot", "M2/M3")
-    return result.model_dump()
+    return perform_capture(
+        target,
+        monitor_index=monitor_index,
+        window_id=window_id,
+        app_name=app_name,
+        title_contains=title_contains,
+        x=x, y=y, w=w, h=h,
+    )
 
 
 # --------------------------------------------------------------------------- #

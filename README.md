@@ -25,9 +25,9 @@ User ─────────────────────────
 Under active development. Milestones (plan §11):
 
 - **M0** ✅ scaffold, shared core interfaces, EnvironmentChecker, host + stdio adapter
-- **M1** vision backends (Anthropic / OpenAI-compatible / Ollama) + preprocessing + parse fallback
-- **M2/M3** ScreenCaptureKit monitor + window capture (macOS)
-- **M4** tray menu + status + clipboard supporter + backend management UI
+- **M1** ✅ vision backends (Anthropic / OpenAI-compatible / Ollama) + preprocessing + parse fallback
+- **M2/M3** ✅ ScreenCaptureKit monitor + window capture (macOS) + region capture (drag/coords)
+- **M4** ✅ tray menu + status icon + clipboard supporter + backend management UI
 - **M5** environment loop + onboarding + consent
 - **M6** Windows port · **M7** Ollama, convenience chain, stabilization
 
