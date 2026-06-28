@@ -31,7 +31,7 @@ def _not_implemented(feature: str, milestone: str) -> dict[str, Any]:
     return {
         "status": "not_implemented",
         "feature": feature,
-        "message": f"'{feature}'는 마일스톤 {milestone}에서 제공됩니다.",
+        "message": f"'{feature}' is provided in milestone {milestone}.",
     }
 
 
@@ -40,10 +40,10 @@ def _not_implemented(feature: str, milestone: str) -> dict[str, Any]:
 # --------------------------------------------------------------------------- #
 @mcp.tool
 def check_environment() -> dict[str, Any]:
-    """현재 실행 환경(런타임/패키지/권한/자격증명/설정)을 점검하고 누락 항목 가이드를 반환한다."""
+    """Check the runtime/packages/permissions/credentials/settings and return a guide for any gaps."""
     status = EnvironmentChecker().check_full()
     if status.ok:
-        return {"status": "ok", "message": "환경 구성이 완료되었습니다."}
+        return {"status": "ok", "message": "Environment is fully configured."}
     return status.to_guide()
 
 
@@ -52,7 +52,7 @@ def check_environment() -> dict[str, Any]:
 # --------------------------------------------------------------------------- #
 @mcp.tool
 def list_monitors() -> dict[str, Any]:
-    """캡처 대상 모니터 목록을 반환한다."""
+    """Return the list of monitors available for capture."""
     env = EnvironmentChecker().check_for_capture()
     if not env.ok:
         return env.to_guide()
@@ -66,7 +66,7 @@ def list_monitors() -> dict[str, Any]:
 
 @mcp.tool
 def list_windows() -> dict[str, Any]:
-    """캡처 대상이 될 수 있는 열린 윈도우 목록(앱명/제목/ID)을 반환한다."""
+    """Return open windows available for capture (app name / title / id)."""
     env = EnvironmentChecker().check_for_capture()
     if not env.ok:
         return env.to_guide()
@@ -90,15 +90,15 @@ def take_screenshot(
     w: int | None = None,
     h: int | None = None,
 ) -> dict[str, Any]:
-    """화면을 캡처해 타겟 폴더에 저장한다.
+    """Capture the screen and save it to the target folder.
 
     target:
-      - 'monitor'            : 모니터 전체화면 (monitor_index)
-      - 'window'             : 특정 윈도우 (window_id, 또는 app_name/title_contains 셀렉터)
-      - 'region'             : 좌표 영역 (x, y, w, h; 주 디스플레이 좌상단 기준 픽셀)
-      - 'region_interactive' : 사용자가 마우스로 사각형 영역을 드래그 선택 (사용자 조작 필요)
+      - 'monitor'            : full screen of a monitor (monitor_index)
+      - 'window'             : a specific window (window_id, or app_name/title_contains selector)
+      - 'region'             : coordinate region (x, y, w, h; pixels from the primary display's top-left)
+      - 'region_interactive' : the user drag-selects a rectangle (requires user interaction)
 
-    작은 영역은 분석 시 원본 그대로, 큰 영역은 자동 다운스케일되어 전송된다(§7.5).
+    Small regions are sent as-is for analysis; large ones are auto-downscaled (§7.5).
     """
     from ..core.capture_service import perform_capture  # noqa: PLC0415
 
@@ -119,12 +119,12 @@ def take_screenshot(
 def analyze_vision(
     image_path: str,
     prompt: str = (
-        "현재 UI에서 겹치거나 깨진 부분, 정렬 불량, 요소 가려짐/잘림을 찾아 "
-        "원인이 될 만한 CSS/스타일 영역과 함께 설명해 줘."
+        "Find overlapping/broken parts, misalignment, and clipped/occluded elements "
+        "in this UI, and explain them with the likely CSS/style areas to fix."
     ),
     backend: str | None = None,
 ) -> dict[str, Any]:
-    """이미지 경로 + 프롬프트를 받아 비전 백엔드로 분석하고 정형 리포트를 반환한다."""
+    """Analyze an image (path + prompt) with the vision backend and return a structured report."""
     env = EnvironmentChecker().check_for_vision(backend)
     if not env.ok:
         return env.to_guide()
@@ -147,7 +147,7 @@ def capture_and_analyze(
     prompt: str | None = None,
     backend: str | None = None,
 ) -> dict[str, Any]:
-    """캡처→분석을 한 번에 수행하는 편의 체인(plan §5.4). target은 take_screenshot과 동일."""
+    """Convenience chain: capture then analyze (plan §5.4). `target` matches take_screenshot."""
     shot = take_screenshot(
         target=target, monitor_index=monitor_index, window_id=window_id,
         app_name=app_name, title_contains=title_contains, x=x, y=y, w=w, h=h
@@ -165,7 +165,7 @@ def capture_and_analyze(
 # --------------------------------------------------------------------------- #
 @mcp.tool
 def get_config() -> dict[str, Any]:
-    """현재 설정(타겟 폴더, 등록된 provider, 기본 provider 등)을 반환한다. API 키는 포함하지 않는다."""
+    """Return the current settings (target folder, providers, default provider). Never includes API keys."""
     config = cfg.load_config()
     return {
         "status": "ok",
@@ -181,12 +181,12 @@ def get_config() -> dict[str, Any]:
 
 @mcp.tool
 def set_target_folder(path: str) -> dict[str, Any]:
-    """캡처 이미지가 저장될 타겟 폴더를 설정한다(트레이앱과 동일 설정 파일 공유)."""
+    """Set the target folder where captures are saved (shares the tray app's config file)."""
     folder = Path(path).expanduser()
     try:
         folder.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
-        return {"status": "error", "message": f"폴더를 생성할 수 없습니다: {exc}"}
+        return {"status": "error", "message": f"Cannot create folder: {exc}"}
     config = cfg.load_config()
     config.target_folder = str(folder)
     cfg.save_config(config)

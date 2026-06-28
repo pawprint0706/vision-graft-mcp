@@ -46,18 +46,18 @@ _RETRYABLE: frozenset[VisionErrorCode] = frozenset(
 
 # Default human guidance per code (plan §7.8.1 "권장 next_action").
 NEXT_ACTION: dict[VisionErrorCode, str] = {
-    VisionErrorCode.AUTH_FAILED: "트레이 '비전 백엔드 관리'에서 API 키를 확인·재등록하십시오.",
-    VisionErrorCode.RATE_LIMIT: "잠시 후(retry_after_sec) 재시도하거나 다른 백엔드를 지정하십시오.",
-    VisionErrorCode.QUOTA_EXCEEDED: "결제/플랜을 확인하거나 로컬(Ollama) 백엔드로 전환하십시오.",
-    VisionErrorCode.TIMEOUT: "재시도하고, 지속되면 이미지를 축소하거나 다른 백엔드를 사용하십시오.",
-    VisionErrorCode.NETWORK: "네트워크 연결을 확인 후 재시도하십시오(로컬 백엔드는 영향이 적습니다).",
-    VisionErrorCode.SERVER_ERROR: "잠시 후 재시도하거나 다른 백엔드를 지정하십시오.",
-    VisionErrorCode.BAD_REQUEST: "모델명/이미지 형식·크기를 점검하십시오(전처리 재확인).",
-    VisionErrorCode.CONTENT_FILTERED: "프롬프트/이미지를 조정하거나 다른 백엔드를 사용하십시오.",
-    VisionErrorCode.MODEL_NOT_FOUND: "provider 설정에서 모델명을 수정하십시오.",
-    VisionErrorCode.OLLAMA_UNAVAILABLE: "'ollama serve' 기동 및 'ollama pull <model>' 후 재시도하십시오.",
-    VisionErrorCode.RESPONSE_INVALID: "재시도하거나 다른 백엔드를 사용하십시오.",
-    VisionErrorCode.UNKNOWN: "재시도하고, 지속되면 로그를 첨부해 보고하십시오.",
+    VisionErrorCode.AUTH_FAILED: "Check/re-enter the API key in the tray 'Manage vision backends'.",
+    VisionErrorCode.RATE_LIMIT: "Retry after retry_after_sec, or specify a different backend.",
+    VisionErrorCode.QUOTA_EXCEEDED: "Check billing/plan, or switch to the local (Ollama) backend.",
+    VisionErrorCode.TIMEOUT: "Retry; if it persists, downscale the image or use another backend.",
+    VisionErrorCode.NETWORK: "Check the network and retry (local backends are unaffected).",
+    VisionErrorCode.SERVER_ERROR: "Retry shortly, or specify a different backend.",
+    VisionErrorCode.BAD_REQUEST: "Check the model name and image format/size (review preprocessing).",
+    VisionErrorCode.CONTENT_FILTERED: "Adjust the prompt/image, or use another backend.",
+    VisionErrorCode.MODEL_NOT_FOUND: "Fix the model name in the provider settings.",
+    VisionErrorCode.OLLAMA_UNAVAILABLE: "Start 'ollama serve' and 'ollama pull <model>', then retry.",
+    VisionErrorCode.RESPONSE_INVALID: "Retry, or use another backend.",
+    VisionErrorCode.UNKNOWN: "Retry; if it persists, report with logs attached.",
 }
 
 

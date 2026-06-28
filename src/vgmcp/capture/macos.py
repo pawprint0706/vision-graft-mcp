@@ -35,9 +35,9 @@ def _run_sync(starter: Callable[[Callable], None], timeout: float = _SYNC_TIMEOU
 
     starter(handler)
     if not done.wait(timeout):
-        raise CaptureError("ScreenCaptureKit 호출이 시간 내에 응답하지 않았습니다.")
+        raise CaptureError("ScreenCaptureKit call did not respond in time.")
     if box.get("error") is not None:
-        raise CaptureError(f"ScreenCaptureKit 오류: {box['error']}")
+        raise CaptureError(f"ScreenCaptureKit error: {box['error']}")
     return box.get("result")
 
 
@@ -71,10 +71,10 @@ def _cgimage_to_png(cgimage, path: Path) -> tuple[int, int]:
     url = NSURL.fileURLWithPath_(str(path))
     dest = Quartz.CGImageDestinationCreateWithURL(url, "public.png", 1, None)
     if dest is None:
-        raise CaptureError(f"이미지 대상 생성 실패: {path}")
+        raise CaptureError(f"Failed to create image destination: {path}")
     Quartz.CGImageDestinationAddImage(dest, cgimage, None)
     if not Quartz.CGImageDestinationFinalize(dest):
-        raise CaptureError(f"PNG 저장 실패: {path}")
+        raise CaptureError(f"Failed to save PNG: {path}")
     return width, height
 
 
@@ -114,7 +114,7 @@ class MacOSCaptureBackend:
     def _displays(self):
         content = _shareable_content()
         if content is None:
-            raise CaptureError("공유 가능한 화면 콘텐츠를 가져오지 못했습니다(권한 확인).")
+            raise CaptureError("Could not get shareable screen content (check permission).")
         return list(content.displays())
 
     def list_monitors(self) -> list[MonitorInfo]:
@@ -140,7 +140,7 @@ class MacOSCaptureBackend:
     def _windows(self):
         content = _shareable_content()
         if content is None:
-            raise CaptureError("공유 가능한 화면 콘텐츠를 가져오지 못했습니다(권한 확인).")
+            raise CaptureError("Could not get shareable screen content (check permission).")
         return list(content.windows())
 
     def list_windows(self) -> list[WindowInfo]:
@@ -189,7 +189,7 @@ class MacOSCaptureBackend:
 
         displays = self._displays()
         if index < 0 or index >= len(displays):
-            raise CaptureError(f"모니터 인덱스 범위를 벗어났습니다: {index} (0..{len(displays) - 1})")
+            raise CaptureError(f"Monitor index out of range: {index} (0..{len(displays) - 1})")
         disp = displays[index]
         scales = _scale_by_display_id()
         scale = scales.get(int(disp.displayID()), 1.0)
@@ -206,7 +206,7 @@ class MacOSCaptureBackend:
             )
         )
         if cgimage is None:
-            raise CaptureError("캡처 결과 이미지가 비어 있습니다(권한/디스플레이 확인).")
+            raise CaptureError("Captured image is empty (check permission/display).")
 
         dest.mkdir(parents=True, exist_ok=True)
         path = dest / f"monitor{index}_{_timestamp()}.png"
@@ -220,7 +220,7 @@ class MacOSCaptureBackend:
         _ensure_app()
         scwin = next((w for w in self._windows() if int(w.windowID()) == window_id), None)
         if scwin is None:
-            raise CaptureError(f"윈도우를 찾을 수 없습니다: window_id={window_id}")
+            raise CaptureError(f"Window not found: window_id={window_id}")
 
         content_filter = SCK.SCContentFilter.alloc().initWithDesktopIndependentWindow_(scwin)
         # contentRect (points) * pointPixelScale -> full-resolution pixel size.
@@ -236,7 +236,7 @@ class MacOSCaptureBackend:
             )
         )
         if cgimage is None:
-            raise CaptureError("윈도우 캡처 결과 이미지가 비어 있습니다.")
+            raise CaptureError("Window capture produced an empty image.")
 
         app = scwin.owningApplication()
         app_name = app.applicationName() if app is not None else "window"
@@ -253,7 +253,7 @@ class MacOSCaptureBackend:
         from PIL import Image  # noqa: PLC0415
 
         if w <= 0 or h <= 0:
-            raise CaptureError(f"영역 크기가 유효하지 않습니다: {w}x{h}")
+            raise CaptureError(f"Invalid region size: {w}x{h}")
         full = self.capture_monitor(0, dest)
         full_path = Path(full.path)
         try:
@@ -264,7 +264,7 @@ class MacOSCaptureBackend:
                 right = min(im.width, x + w)
                 bottom = min(im.height, y + h)
                 if right <= left or bottom <= top:
-                    raise CaptureError("요청한 영역이 화면 범위를 벗어났습니다.")
+                    raise CaptureError("The requested region is out of screen bounds.")
                 cropped = im.crop((left, top, right, bottom))
                 path = dest / f"region_{_timestamp()}.png"
                 cropped.save(path, format="PNG")
@@ -295,7 +295,7 @@ class MacOSCaptureBackend:
                 timeout=120,
             )
         except (subprocess.CalledProcessError, FileNotFoundError) as exc:
-            raise CaptureError(f"screencapture 실행 실패: {exc}") from exc
+            raise CaptureError(f"screencapture failed: {exc}") from exc
         except subprocess.TimeoutExpired:
             return None
         if not path.exists():

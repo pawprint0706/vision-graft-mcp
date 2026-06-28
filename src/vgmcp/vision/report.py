@@ -14,19 +14,20 @@ from ..core.models import VisionIssue, VisionReportBody
 # Schema instruction appended to every prompt for backends without native
 # structured output (plan §7.7).
 SCHEMA_INSTRUCTION = (
-    "\n\n반드시 아래 JSON 스키마로만 답하라. 코드펜스나 설명 없이 JSON 객체 하나만 출력하라.\n"
+    "\n\nRespond with ONLY the following JSON schema. Output a single JSON object "
+    "with no code fences and no extra prose.\n"
     '{\n'
-    '  "summary": "<한 줄 요약>",\n'
+    '  "summary": "<one-line summary>",\n'
     '  "issues": [\n'
-    '    {"severity": "high|medium|low", "region": "<위치>", "element": "<요소>",\n'
-    '     "description": "<설명>", "css_hint": "<원인이 될 만한 CSS/스타일 힌트>"}\n'
+    '    {"severity": "high|medium|low", "region": "<where>", "element": "<element>",\n'
+    '     "description": "<description>", "css_hint": "<likely CSS/style cause>"}\n'
     '  ]\n'
     '}'
 )
 
 CORRECTIVE_INSTRUCTION = (
-    "직전 응답이 요구한 JSON 형식이 아니었다. 아래 내용을 지정한 JSON 스키마로만 다시 출력하라. "
-    "설명/코드펜스 없이 JSON 객체 하나만:\n\n"
+    "Your previous reply was not in the required JSON format. Re-output the content "
+    "below as a single JSON object matching the schema, with no prose or code fences:\n\n"
 )
 
 _BLOCK_RE = re.compile(r"\{.*\}", re.DOTALL)

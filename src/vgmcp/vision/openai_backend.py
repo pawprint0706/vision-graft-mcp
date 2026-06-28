@@ -32,7 +32,7 @@ class OpenAICompatibleBackend(BaseVisionBackend):
         if not base_url:
             raise VisionError(
                 VisionErrorCode.BAD_REQUEST,
-                "custom provider에는 base_url이 필요합니다.",
+                "A custom provider requires base_url.",
             )
         self.base_url = base_url.rstrip("/")
         self.model = provider.model or _DEFAULT_MODELS.get(provider.type, "")
@@ -42,9 +42,9 @@ class OpenAICompatibleBackend(BaseVisionBackend):
 
     def _complete(self, image_bytes: bytes, mime: str, prompt: str) -> str:
         if not self.api_key:
-            raise VisionError(VisionErrorCode.AUTH_FAILED, "API 키가 없습니다.")
+            raise VisionError(VisionErrorCode.AUTH_FAILED, "Missing API key.")
         if not self.model:
-            raise VisionError(VisionErrorCode.MODEL_NOT_FOUND, "모델명이 지정되지 않았습니다.")
+            raise VisionError(VisionErrorCode.MODEL_NOT_FOUND, "No model name specified.")
         b64 = base64.b64encode(image_bytes).decode("ascii")
         data_uri = f"data:{mime};base64,{b64}"
         body = {
@@ -78,13 +78,13 @@ class OpenAICompatibleBackend(BaseVisionBackend):
         data = resp.json()
         choices = data.get("choices") or []
         if not choices:
-            raise VisionError(VisionErrorCode.RESPONSE_INVALID, "빈 응답을 받았습니다.")
+            raise VisionError(VisionErrorCode.RESPONSE_INVALID, "Received an empty response.")
         finish = choices[0].get("finish_reason")
         if finish == "content_filter":
-            raise VisionError(VisionErrorCode.CONTENT_FILTERED, "안전 필터에 의해 차단되었습니다.")
+            raise VisionError(VisionErrorCode.CONTENT_FILTERED, "Blocked by the safety filter.")
         text = (choices[0].get("message") or {}).get("content") or ""
         if isinstance(text, list):  # some providers return content parts
             text = "".join(p.get("text", "") for p in text if isinstance(p, dict))
         if not text:
-            raise VisionError(VisionErrorCode.RESPONSE_INVALID, "빈 응답을 받았습니다.")
+            raise VisionError(VisionErrorCode.RESPONSE_INVALID, "Received an empty response.")
         return text

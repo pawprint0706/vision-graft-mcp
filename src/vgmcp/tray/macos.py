@@ -36,12 +36,10 @@ _RECOMMENDED_MODEL = {"anthropic": "claude-sonnet-4-6", "openai": "gpt-4o",
 _RECOMMENDED_LABEL = {"anthropic": "claude-sonnet-4-6", "openai": "gpt-4o",
                       "openrouter": "openai/gpt-4o"}
 
-# The analysis prompt is localized so the model replies in the user's language.
-_ANALYZE_PROMPT = tr(
-    "현재 UI에서 겹치거나 깨진 부분, 정렬 불량, 요소 가려짐/잘림을 찾아 "
-    "원인이 될 만한 CSS/스타일 영역과 함께 설명해 줘.",
+# LLM-facing: always English (models are more reliable with English instructions).
+_ANALYZE_PROMPT = (
     "Find overlapping/broken parts, misalignment, and clipped/occluded elements "
-    "in this UI, and explain them along with the likely CSS/style areas to fix.",
+    "in this UI, and explain them along with the likely CSS/style areas to fix."
 )
 
 

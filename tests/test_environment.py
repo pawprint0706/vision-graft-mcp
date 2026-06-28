@@ -40,6 +40,7 @@ def test_pinned_config_is_not_reloaded(tmp_path, monkeypatch):
 
 def test_detailed_report_shape(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    monkeypatch.setenv("VGMCP_LANG", "ko")  # detailed() labels are localized
     report = EnvironmentChecker().detailed()
     labels = [label for label, _ok, _detail in report]
     assert "Python ≥ 3.11" in labels

@@ -27,9 +27,9 @@ def run_analysis(image_path: Path, prompt: str, backend_id: str | None) -> dict[
         return {
             "status": "error",
             "message": (
-                f"provider를 찾을 수 없습니다: {backend_id}"
+                f"Provider not found: {backend_id}"
                 if backend_id
-                else "등록된 비전 백엔드가 없습니다. check_environment를 호출하십시오."
+                else "No vision backend registered. Call check_environment."
             ),
         }
 
@@ -40,13 +40,14 @@ def run_analysis(image_path: Path, prompt: str, backend_id: str | None) -> dict[
             "backend": provider.id,
             "provider_type": provider.type,
             "message": (
-                f"'{provider.label or provider.id}'({provider.type})로 스크린샷을 외부 전송합니다. "
-                "최초 1회 동의가 필요합니다."
+                f"Screenshots will be sent externally to '{provider.label or provider.id}'"
+                f"({provider.type}). One-time consent is required."
             ),
             "next_action": (
-                "사용자에게 외부 전송 동의를 받은 뒤, 트레이 '비전 백엔드 관리'의 해당 provider "
-                f"동의 항목을 켜거나 `vgmcp provider consent {provider.id}`를 실행한 후 재시도하십시오. "
-                "민감 화면이 우려되면 로컬 Ollama 백엔드를 사용할 수 있습니다."
+                "Get the user's consent to send screenshots externally, then enable consent for "
+                f"this provider in tray 'Manage vision backends' or run "
+                f"`vgmcp provider consent {provider.id}`, and retry. "
+                "If sensitive screens are a concern, use the local Ollama backend."
             ),
         }
 
@@ -60,7 +61,7 @@ def run_analysis(image_path: Path, prompt: str, backend_id: str | None) -> dict[
         return exc.to_result(provider.id)
     except Exception as exc:  # noqa: BLE001 — misconfig shouldn't crash the tool
         return {"status": "error", "backend": provider.id,
-                "message": f"백엔드 초기화 실패: {exc}"}
+                "message": f"Backend init failed: {exc}"}
 
     try:
         report = backend.analyze(image_path, prompt)
@@ -69,7 +70,7 @@ def run_analysis(image_path: Path, prompt: str, backend_id: str | None) -> dict[
     except Exception as exc:  # noqa: BLE001 — surface unexpected failures as structured error
         from ..core.errors import VisionError as _VE, VisionErrorCode  # noqa: PLC0415
 
-        return _VE(VisionErrorCode.UNKNOWN, f"예기치 못한 오류: {exc}").to_result(provider.id)
+        return _VE(VisionErrorCode.UNKNOWN, f"Unexpected error: {exc}").to_result(provider.id)
 
     # Success: last-used becomes the effective default going forward (plan §7.3).
     config.mark_used(provider.id)

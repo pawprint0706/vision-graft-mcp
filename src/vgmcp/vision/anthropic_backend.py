@@ -32,7 +32,7 @@ class AnthropicBackend(BaseVisionBackend):
 
     def _complete(self, image_bytes: bytes, mime: str, prompt: str) -> str:
         if not self.api_key:
-            raise VisionError(VisionErrorCode.AUTH_FAILED, "ANTHROPIC API 키가 없습니다.")
+            raise VisionError(VisionErrorCode.AUTH_FAILED, "Missing Anthropic API key.")
         b64 = base64.b64encode(image_bytes).decode("ascii")
         body = {
             "model": self.model,
@@ -63,9 +63,9 @@ class AnthropicBackend(BaseVisionBackend):
 
         data = resp.json()
         if data.get("stop_reason") == "refusal":
-            raise VisionError(VisionErrorCode.CONTENT_FILTERED, "모델이 응답을 거부했습니다.")
+            raise VisionError(VisionErrorCode.CONTENT_FILTERED, "The model refused to respond.")
         parts = data.get("content") or []
         text = "".join(p.get("text", "") for p in parts if p.get("type") == "text")
         if not text:
-            raise VisionError(VisionErrorCode.RESPONSE_INVALID, "빈 응답을 받았습니다.")
+            raise VisionError(VisionErrorCode.RESPONSE_INVALID, "Received an empty response.")
         return text

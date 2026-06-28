@@ -22,13 +22,13 @@ MIN_PYTHON = (3, 11)
 
 # Package -> (pip name, why) for the active platform's capture/tray stack.
 _MACOS_CAPTURE_PKGS = {
-    "ScreenCaptureKit": ("pyobjc-framework-ScreenCaptureKit", "macOS 화면/윈도우 캡처(ScreenCaptureKit)"),
-    "Quartz": ("pyobjc-framework-Quartz", "macOS 윈도우 열거 보조"),
-    "AppKit": ("pyobjc-framework-Cocoa", "macOS 앱↔PID 매핑/트레이"),
+    "ScreenCaptureKit": ("pyobjc-framework-ScreenCaptureKit", "macOS screen/window capture (ScreenCaptureKit)"),
+    "Quartz": ("pyobjc-framework-Quartz", "macOS window enumeration helper"),
+    "AppKit": ("pyobjc-framework-Cocoa", "macOS app↔PID mapping / tray"),
 }
 _WINDOWS_CAPTURE_PKGS = {
-    "win32gui": ("pywin32", "Windows 윈도우 열거"),
-    "mss": ("mss", "Windows 영역 캡처"),
+    "win32gui": ("pywin32", "Windows window enumeration"),
+    "mss": ("mss", "Windows region capture"),
 }
 
 
@@ -38,8 +38,8 @@ def _check_python() -> list[EnvIssue]:
             EnvIssue(
                 category=EnvCategory.RUNTIME,
                 name=f"python>={MIN_PYTHON[0]}.{MIN_PYTHON[1]}",
-                reason=f"현재 {sys.version_info.major}.{sys.version_info.minor}, "
-                f"최소 {MIN_PYTHON[0]}.{MIN_PYTHON[1]} 필요",
+                reason=f"found {sys.version_info.major}.{sys.version_info.minor}, "
+                f"requires {MIN_PYTHON[0]}.{MIN_PYTHON[1]}+",
             )
         ]
     return []
@@ -79,8 +79,8 @@ def _check_capture_permission() -> list[EnvIssue]:
             category=EnvCategory.PERMISSION,
             name="screen_recording",
             platform="macos",
-            reason="권한 없으면 캡처가 검은/투명 이미지로 실패",
-            guide="시스템 설정 > 개인정보 보호 및 보안 > 화면 기록에서 본 앱을 허용 후 재시도",
+            reason="Without permission, capture fails as a black/blank image",
+            guide="Allow this app in System Settings > Privacy & Security > Screen Recording, then retry",
         )
     ]
 
@@ -93,8 +93,8 @@ def _check_default_credential(config: AppConfig) -> list[EnvIssue]:
             EnvIssue(
                 category=EnvCategory.CREDENTIAL,
                 name="vision_provider",
-                reason="등록된 비전 백엔드가 없습니다",
-                guide="트레이 '설정 > 비전 백엔드 관리'에서 provider를 추가하십시오.",
+                reason="No vision backend is registered",
+                guide="Add a provider in tray 'Settings > Manage vision backends'.",
             )
         ]
     if provider.is_local:
@@ -105,8 +105,8 @@ def _check_default_credential(config: AppConfig) -> list[EnvIssue]:
             EnvIssue(
                 category=EnvCategory.CREDENTIAL,
                 name=f"api_key:{provider.id}",
-                reason=f"'{provider.label or provider.id}' provider의 API 키를 찾을 수 없습니다",
-                guide="트레이 '설정 > 비전 백엔드 관리'에서 API 키를 등록하거나 환경변수를 설정하십시오.",
+                reason=f"No API key found for provider '{provider.label or provider.id}'",
+                guide="Register an API key in tray 'Settings > Manage vision backends', or set an env var.",
             )
         ]
     return []
@@ -121,8 +121,8 @@ def _check_target_folder(config: AppConfig) -> list[EnvIssue]:
             EnvIssue(
                 category=EnvCategory.SETTING,
                 name="target_folder",
-                reason=f"타겟 폴더를 생성/쓰기할 수 없습니다: {exc}",
-                guide="트레이 '설정 > 타겟 폴더 설정'에서 쓰기 가능한 폴더를 지정하십시오.",
+                reason=f"Cannot create/write the target folder: {exc}",
+                guide="Choose a writable folder in tray 'Settings > Set target folder'.",
             )
         ]
     import os  # noqa: PLC0415
@@ -132,8 +132,8 @@ def _check_target_folder(config: AppConfig) -> list[EnvIssue]:
             EnvIssue(
                 category=EnvCategory.SETTING,
                 name="target_folder",
-                reason=f"타겟 폴더에 쓰기 권한이 없습니다: {folder}",
-                guide="트레이 '설정 > 타겟 폴더 설정'에서 쓰기 가능한 폴더를 지정하십시오.",
+                reason=f"No write permission on the target folder: {folder}",
+                guide="Choose a writable folder in tray 'Settings > Set target folder'.",
             )
         ]
     return []
@@ -204,8 +204,8 @@ class EnvironmentChecker:
                     EnvIssue(
                         category=EnvCategory.SETTING,
                         name=f"provider:{provider_id}",
-                        reason=f"지정한 provider를 찾을 수 없습니다: {provider_id}",
-                        guide="check_environment로 등록된 provider 목록을 확인하십시오.",
+                        reason=f"Provider not found: {provider_id}",
+                        guide="Check the registered providers via check_environment.",
                     )
                 )
             elif not provider.is_local and not credentials.get_key(
@@ -215,8 +215,8 @@ class EnvironmentChecker:
                     EnvIssue(
                         category=EnvCategory.CREDENTIAL,
                         name=f"api_key:{provider_id}",
-                        reason=f"'{provider_id}' provider의 API 키가 없습니다",
-                        guide="트레이 '설정 > 비전 백엔드 관리'에서 키를 등록하십시오.",
+                        reason=f"No API key for provider '{provider_id}'",
+                        guide="Register a key in tray 'Settings > Manage vision backends'.",
                     )
                 )
         else:

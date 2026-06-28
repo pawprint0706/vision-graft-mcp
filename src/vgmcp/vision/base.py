@@ -34,7 +34,7 @@ class BaseVisionBackend(VisionBackend):
     def analyze(self, image_path: Path, prompt: str) -> VisionReportBody:
         if not image_path.exists():
             raise VisionError(
-                VisionErrorCode.BAD_REQUEST, f"이미지 파일이 존재하지 않습니다: {image_path}"
+                VisionErrorCode.BAD_REQUEST, f"Image file does not exist: {image_path}"
             )
         cfg = load_config()
         image_bytes, mime, _w, _h = preprocess(
@@ -65,12 +65,12 @@ class BaseVisionBackend(VisionBackend):
 def map_httpx_error(exc: Exception) -> VisionError:
     """Translate an httpx exception into a VisionError (plan §7.8.1)."""
     if isinstance(exc, httpx.TimeoutException):
-        return VisionError(VisionErrorCode.TIMEOUT, str(exc) or "요청 시간 초과")
+        return VisionError(VisionErrorCode.TIMEOUT, str(exc) or "request timed out")
     if isinstance(exc, httpx.HTTPStatusError):
         return map_status(exc.response.status_code, exc)
     if isinstance(exc, httpx.HTTPError):
-        return VisionError(VisionErrorCode.NETWORK, str(exc) or "네트워크 오류")
-    return VisionError(VisionErrorCode.UNKNOWN, str(exc) or "알 수 없는 오류")
+        return VisionError(VisionErrorCode.NETWORK, str(exc) or "network error")
+    return VisionError(VisionErrorCode.UNKNOWN, str(exc) or "unknown error")
 
 
 def map_status(status: int, exc: Exception | None = None) -> VisionError:

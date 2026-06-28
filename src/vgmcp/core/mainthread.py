@@ -57,7 +57,7 @@ def run_on_main(func: Callable[[], T], timeout: float = 30.0) -> T:
 
     AppHelper.callAfter(wrapper)
     if not done.wait(timeout):
-        raise TimeoutError("메인 스레드 작업이 시간 내에 완료되지 않았습니다.")
+        raise TimeoutError("Main-thread work did not complete in time.")
     if "error" in box:
         raise box["error"]  # type: ignore[misc]
     return box["result"]  # type: ignore[return-value]

@@ -27,7 +27,7 @@ from .core.platform import is_macos, module_available
 def _resolve_key_arg(value: str | None) -> str | None:
     """If --key is '-', read it hidden via getpass so it never hits argv/logs."""
     if value == "-":
-        return getpass.getpass("API 키 입력(숨김): ").strip() or None
+        return getpass.getpass("API key (hidden): ").strip() or None
     return value
 
 
@@ -54,7 +54,7 @@ def _cmd_provider_add(args) -> int:
     config = cfg.load_config()
     pid = args.id or args.type
     if config.get_provider(pid):
-        print(f"이미 존재하는 provider id: {pid}", file=sys.stderr)
+        print(f"provider id already exists: {pid}", file=sys.stderr)
         return 1
 
     key_ref = None
@@ -65,7 +65,7 @@ def _cmd_provider_add(args) -> int:
         credentials.set_key(key_ref, key_value)
     elif args.type != "ollama" and not credentials.has_env_fallback(args.type):
         print(
-            f"경고: '{args.type}' 키가 없습니다. --key로 등록하거나 환경변수를 설정하세요.",
+            f"Warning: no key for '{args.type}'. Register with --key or set an env var.",
             file=sys.stderr,
         )
 
@@ -90,7 +90,7 @@ def _cmd_provider_update(args) -> int:
     config = cfg.load_config()
     provider = config.get_provider(args.id)
     if provider is None:
-        print(f"provider를 찾을 수 없습니다: {args.id}", file=sys.stderr)
+        print(f"provider not found: {args.id}", file=sys.stderr)
         return 1
     if args.type is not None:
         provider.type = args.type
@@ -118,7 +118,7 @@ def _cmd_provider_remove(args) -> int:
     config = cfg.load_config()
     provider = config.get_provider(args.id)
     if provider is None:
-        print(f"provider를 찾을 수 없습니다: {args.id}", file=sys.stderr)
+        print(f"provider not found: {args.id}", file=sys.stderr)
         return 1
     if provider.key_ref:
         credentials.delete_key(provider.key_ref)
@@ -132,7 +132,7 @@ def _cmd_provider_remove(args) -> int:
 def _cmd_provider_consent(args) -> int:
     config = cfg.load_config()
     if not config.set_consent(args.id, not args.revoke):
-        print(f"provider를 찾을 수 없습니다: {args.id}", file=sys.stderr)
+        print(f"provider not found: {args.id}", file=sys.stderr)
         return 1
     cfg.save_config(config)
     print(json.dumps({"status": "ok", "id": args.id,
@@ -204,67 +204,67 @@ def _cmd_capture_analyze(args) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="vgmcp", description="Vision-Graft MCP")
     parser.add_argument("--no-tray", action="store_true",
-                        help="트레이 없이 HTTP 호스트만 포그라운드로 실행")
+                        help="run only the HTTP host in the foreground (no tray)")
     parser.set_defaults(func=_run_app)
     sub = parser.add_subparsers(dest="command")
 
-    sub.add_parser("check", help="환경 점검 결과 출력").set_defaults(func=_cmd_check)
+    sub.add_parser("check", help="print the environment check result").set_defaults(func=_cmd_check)
 
-    p_prov = sub.add_parser("provider", help="비전 provider 관리")
+    p_prov = sub.add_parser("provider", help="manage vision providers")
     prov_sub = p_prov.add_subparsers(dest="prov_command", required=True)
-    p_add = prov_sub.add_parser("add", help="provider 등록")
+    p_add = prov_sub.add_parser("add", help="register a provider")
     p_add.add_argument("--type", required=True,
                        choices=["anthropic", "openai", "openrouter", "custom", "ollama"])
-    p_add.add_argument("--id", help="provider id (기본=type)")
+    p_add.add_argument("--id", help="provider id (default = type)")
     p_add.add_argument("--label")
-    p_add.add_argument("--model", help="모델명 (미지정 시 백엔드 기본값)")
-    p_add.add_argument("--base-url", dest="base_url", help="custom provider의 엔드포인트")
-    p_add.add_argument("--key", help="API 키 ('-' 입력 시 숨김 프롬프트; 미지정 시 환경변수 사용; 키체인에 저장)")
+    p_add.add_argument("--model", help="model name (defaults to the backend default)")
+    p_add.add_argument("--base-url", dest="base_url", help="endpoint for a custom provider")
+    p_add.add_argument("--key", help="API key ('-' = hidden prompt; omit to use an env var; stored in the keychain)")
     p_add.add_argument("--set-default", action="store_true")
     p_add.set_defaults(func=_cmd_provider_add)
 
-    p_upd = prov_sub.add_parser("update", help="provider 수정")
+    p_upd = prov_sub.add_parser("update", help="update a provider")
     p_upd.add_argument("id")
     p_upd.add_argument("--type",
                        choices=["anthropic", "openai", "openrouter", "custom", "ollama"])
     p_upd.add_argument("--model")
     p_upd.add_argument("--label")
     p_upd.add_argument("--base-url", dest="base_url")
-    p_upd.add_argument("--key", help="API 키 교체 ('-' 입력 시 숨김 프롬프트; 키체인에 저장)")
+    p_upd.add_argument("--key", help="replace the API key ('-' = hidden prompt; stored in the keychain)")
     p_upd.add_argument("--set-default", action="store_true")
     p_upd.set_defaults(func=_cmd_provider_update)
 
-    p_rm = prov_sub.add_parser("remove", help="provider 삭제 (키체인 키도 삭제)")
+    p_rm = prov_sub.add_parser("remove", help="remove a provider (also deletes its keychain key)")
     p_rm.add_argument("id")
     p_rm.set_defaults(func=_cmd_provider_remove)
 
-    p_cs = prov_sub.add_parser("consent", help="외부 전송 동의 부여/철회 (§7.9)")
+    p_cs = prov_sub.add_parser("consent", help="grant/revoke external-transmission consent (§7.9)")
     p_cs.add_argument("id")
-    p_cs.add_argument("--revoke", action="store_true", help="동의 철회")
+    p_cs.add_argument("--revoke", action="store_true", help="revoke consent")
     p_cs.set_defaults(func=_cmd_provider_consent)
 
-    prov_sub.add_parser("list", help="등록된 provider 목록").set_defaults(func=_cmd_provider_list)
+    prov_sub.add_parser("list", help="list registered providers").set_defaults(func=_cmd_provider_list)
 
-    p_an = sub.add_parser("analyze", help="이미지 파일 비전 분석")
+    p_an = sub.add_parser("analyze", help="analyze an image file")
     p_an.add_argument("image")
     p_an.add_argument("--prompt", default=(
-        "현재 UI에서 겹치거나 깨진 부분, 정렬 불량, 요소 가려짐/잘림을 찾아 "
-        "원인이 될 만한 CSS/스타일 영역과 함께 설명해 줘."))
-    p_an.add_argument("--backend", help="provider id (미지정 시 기본값)")
+        "Find overlapping/broken parts, misalignment, and clipped/occluded elements "
+        "in this UI, and explain them with the likely CSS/style areas to fix."))
+    p_an.add_argument("--backend", help="provider id (defaults to the default provider)")
     p_an.set_defaults(func=_cmd_analyze)
 
-    p_as = sub.add_parser("autostart", help="로그인 시 자동 시작 (LaunchAgent)")
+    p_as = sub.add_parser("autostart", help="start at login (LaunchAgent)")
     p_as.add_argument("action", choices=["enable", "disable", "status"], nargs="?",
                       default="status")
     p_as.set_defaults(func=_cmd_autostart)
 
-    p_ca = sub.add_parser("capture-analyze", help="캡처 후 분석")
+    p_ca = sub.add_parser("capture-analyze", help="capture then analyze")
     p_ca.add_argument("--target", default="monitor",
                       choices=["monitor", "window", "region", "region_interactive"])
     p_ca.add_argument("--monitor", type=int, default=0)
     p_ca.add_argument("--window-id", dest="window_id", type=int)
-    p_ca.add_argument("--app-name", dest="app_name", help="target=window 셀렉터(앱 이름)")
-    p_ca.add_argument("--title-contains", dest="title_contains", help="target=window 셀렉터(제목 포함)")
+    p_ca.add_argument("--app-name", dest="app_name", help="target=window selector (app name)")
+    p_ca.add_argument("--title-contains", dest="title_contains", help="target=window selector (title contains)")
     p_ca.add_argument("--x", type=int)
     p_ca.add_argument("--y", type=int)
     p_ca.add_argument("--w", type=int)

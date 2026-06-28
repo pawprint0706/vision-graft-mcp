@@ -38,7 +38,7 @@ def perform_capture(
     backend = get_capture_backend()
     if backend is None:
         return {"status": "not_implemented", "feature": "capture",
-                "message": "이 플랫폼의 캡처 백엔드가 아직 없습니다."}
+                "message": "No capture backend for this platform yet."}
 
     config = cfg.load_config()
     dest = Path(config.target_folder)
@@ -51,19 +51,19 @@ def perform_capture(
                     wid = backend.find_window(app_name, title_contains)
                     if wid is None:
                         return {"status": "error",
-                                "message": "셀렉터에 맞는 윈도우를 찾지 못했습니다. list_windows로 확인하십시오."}
+                                "message": "No window matched the selector. Check list_windows."}
                 if wid is None:
                     return {"status": "error",
-                            "message": "target='window'에는 window_id 또는 app_name/title_contains가 필요합니다."}
+                            "message": "target='window' needs window_id or app_name/title_contains."}
                 return backend.capture_window(wid, dest)
             if target == "region":
                 if None in (x, y, w, h):
-                    return {"status": "error", "message": "target='region'에는 x, y, w, h가 모두 필요합니다."}
+                    return {"status": "error", "message": "target='region' needs all of x, y, w, h."}
                 return backend.capture_region(x, y, w, h, dest)
             if target == "region_interactive":
                 res = backend.capture_region_interactive(dest)
                 if res is None:
-                    return {"status": "cancelled", "message": "사용자가 영역 선택을 취소했습니다."}
+                    return {"status": "cancelled", "message": "Region selection was cancelled."}
                 return res
             return backend.capture_monitor(monitor_index, dest)
         except NotImplementedError:
@@ -89,14 +89,14 @@ def register_image(path: str, *, copy_clipboard: bool | None = None) -> dict[str
 
     p = Path(path)
     if not p.exists():
-        return {"status": "error", "message": f"파일이 존재하지 않습니다: {path}"}
+        return {"status": "error", "message": f"File does not exist: {path}"}
     try:
         from PIL import Image  # noqa: PLC0415
 
         with Image.open(p) as im:
             width, height = im.size
     except Exception as exc:  # noqa: BLE001
-        return {"status": "error", "message": f"이미지를 열 수 없습니다: {exc}"}
+        return {"status": "error", "message": f"Cannot open image: {exc}"}
 
     config = cfg.load_config()
     dest_path = p
@@ -112,7 +112,7 @@ def register_image(path: str, *, copy_clipboard: bool | None = None) -> dict[str
         try:
             shutil.copy2(p, dest_path)
         except OSError as exc:
-            return {"status": "error", "message": f"타겟 폴더로 복사 실패: {exc}"}
+            return {"status": "error", "message": f"Failed to copy into target folder: {exc}"}
 
     result = CaptureResult(path=str(dest_path), width=width, height=height, source="file")
     return _post_capture(result, config, copy_clipboard)

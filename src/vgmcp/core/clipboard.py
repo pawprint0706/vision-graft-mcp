@@ -10,10 +10,10 @@ from datetime import datetime
 from pathlib import Path
 
 DEFAULT_TEMPLATE = (
-    "아래 스크린샷을 분석해 줘. UI 레이아웃 깨짐, 요소 겹침, 정렬 불량, 가려짐 등 "
-    "시각적 버그를 찾고, 원인이 될 만한 CSS/스타일 코드 영역을 짚어 줘.\n\n"
-    "이미지 경로: {image_path}\n"
-    "파일명: {filename}"
+    "Analyze the screenshot below. Find visual bugs — layout breakage, overlapping "
+    "elements, misalignment, occlusion — and point out the likely CSS/style code areas.\n\n"
+    "Image path: {image_path}\n"
+    "File name: {filename}"
 )
 
 

@@ -135,6 +135,6 @@ class EnvStatus(BaseModel):
             "status": "environment_incomplete",
             "blocking": self.blocking,
             "missing": [m.model_dump(exclude_none=True) for m in self.missing],
-            "message_for_user": "환경 구성이 필요합니다. 아래 항목을 해결한 뒤 다시 시도해 주세요.",
-            "next_action": "사용자에게 위 가이드를 전달하고, 해결 완료 후 동일 도구를 재호출하십시오.",
+            "message_for_user": "Environment setup is required. Resolve the items below and try again.",
+            "next_action": "Relay the guide above to the user; once resolved, call the same tool again.",
         }

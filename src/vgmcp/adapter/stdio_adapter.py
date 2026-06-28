@@ -49,12 +49,12 @@ def _fallback_server(url: str):
 
     @fb.tool
     def vgmcp_status() -> dict:
-        """VGMCP 상주 호스트 연결 상태를 반환한다."""
+        """Return the connection status of the resident VGMCP host."""
         return {
             "status": "host_unreachable",
             "server_url": url,
-            "message": "VGMCP 트레이 앱(상주 호스트)이 실행 중이지 않습니다.",
-            "next_action": "VGMCP 트레이 앱을 실행한 뒤(`vgmcp`) 동일 도구를 재호출하십시오.",
+            "message": "The VGMCP tray app (resident host) is not running.",
+            "next_action": "Start the VGMCP tray app (`vgmcp`), then call the same tool again.",
         }
 
     return fb

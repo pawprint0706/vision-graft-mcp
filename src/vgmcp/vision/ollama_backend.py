@@ -41,13 +41,13 @@ class OllamaBackend(BaseVisionBackend):
         except httpx.ConnectError as exc:
             raise VisionError(
                 VisionErrorCode.OLLAMA_UNAVAILABLE,
-                f"로컬 Ollama 서버에 연결할 수 없습니다({self.host}).",
+                f"Cannot connect to the local Ollama server ({self.host}).",
             ) from exc
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 404:
                 raise VisionError(
                     VisionErrorCode.OLLAMA_UNAVAILABLE,
-                    f"모델 '{self.model}'을 찾을 수 없습니다. 'ollama pull {self.model}' 후 재시도.",
+                    f"Model '{self.model}' not found. Run 'ollama pull {self.model}' and retry.",
                     http_status=404,
                 ) from exc
             raise map_httpx_error(exc) from exc
@@ -57,5 +57,5 @@ class OllamaBackend(BaseVisionBackend):
         data = resp.json()
         text = (data.get("message") or {}).get("content") or ""
         if not text:
-            raise VisionError(VisionErrorCode.RESPONSE_INVALID, "빈 응답을 받았습니다.")
+            raise VisionError(VisionErrorCode.RESPONSE_INVALID, "Received an empty response.")
         return text
