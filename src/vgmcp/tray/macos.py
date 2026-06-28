@@ -453,16 +453,22 @@ def _make_app_class():
             if ptype is None:
                 return
             # 2) unique id: typed, since registering the same type twice needs
-            #    distinct ids (e.g. two openai providers).
-            pid = _text_input(
-                "provider 고유 id를 입력하세요.\n같은 종류를 여러 개 등록하려면 서로 다르게 지정하세요.",
-                "백엔드 추가", ptype)
-            if not pid:
-                return
+            #    distinct ids (e.g. two openai providers). The id is internal to
+            #    VGMCP only — never sent to the provider. Re-prompt on duplicates.
             config = cfg.load_config()
-            if config.get_provider(pid):
-                _notify("추가 실패", f"이미 존재하는 id: {pid}")
-                return
+            prompt = ("provider 고유 id를 입력하세요. (VGMCP 내부 구분용 이름이며 외부로 전송되지 않습니다.)\n"
+                      "같은 종류를 여러 개 등록하려면 서로 다르게 지정하세요.")
+            while True:
+                pid = _text_input(prompt, "백엔드 추가", ptype)
+                if not pid:
+                    return  # cancelled
+                if config.get_provider(pid) is None:
+                    break
+                rumps.alert(
+                    title="중복된 id",
+                    message=f"'{pid}' 는 이미 등록되어 있습니다. 다른 id를 입력하세요.",
+                    ok="다시 입력",
+                )
             # 3) model: prefill + introduce a recommended model for cloud providers.
             default_model = _RECOMMENDED_MODEL.get(ptype, "")
             if ptype in _RECOMMENDED_LABEL:
