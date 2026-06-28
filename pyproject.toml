@@ -1,0 +1,59 @@
+[project]
+name = "vision-graft-mcp"
+version = "0.1.0"
+description = "Vision-Graft MCP — gives vision-blind LLMs an 'eye' via OS-level screenshot capture + external vision-model analysis over MCP."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "vgmcp" }]
+keywords = ["mcp", "screenshot", "vision", "llm", "ui-debugging"]
+
+# Core dependencies kept minimal so the package imports on any platform.
+# Native/optional pieces live in extras and are validated by EnvironmentChecker.
+dependencies = [
+    "fastmcp>=2.0",
+    "pillow>=10.0",
+    "httpx>=0.27",
+    "keyring>=24.0",
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+# Vision backends
+anthropic = ["anthropic>=0.40"]
+openai = ["openai>=1.40"]           # also covers OpenRouter / custom OpenAI-compatible endpoints
+# Capture / tray (macOS)
+macos = [
+    "pyobjc-core>=10.0",
+    "pyobjc-framework-Cocoa>=10.0",
+    "pyobjc-framework-Quartz>=10.0",
+    "pyobjc-framework-ScreenCaptureKit>=10.0",
+    "rumps>=0.4.0",
+    "mss>=9.0",
+]
+# Capture / tray (Windows) — future milestone
+windows = [
+    "pywin32>=306",
+    "pygetwindow>=0.0.9",
+    "pystray>=0.19",
+    "mss>=9.0",
+]
+clipboard = ["pyperclip>=1.8"]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+
+[project.scripts]
+# Resident tray app + embedded HTTP/SSE host (primary entry point).
+vgmcp = "vgmcp.cli:main"
+# Thin stdio<->HTTP adapter registered in MCP clients (Cursor/Windsurf).
+vgmcp-adapter = "vgmcp.adapter.stdio_adapter:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vgmcp"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
