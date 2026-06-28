@@ -140,8 +140,16 @@ def _pick_path(*, directory: bool, file_types: list[str] | None = None) -> str |
 def _notify(title: str, message: str) -> None:
     import rumps  # noqa: PLC0415
 
+    from ..core import icons  # noqa: PLC0415
+
+    icon = icons.get_icon("normal", 128)  # brand the toast's app icon (left side)
+    icon_path = str(icon) if icon is not None else None
+
     def _post():
-        rumps.notification(title, None, message)
+        try:
+            rumps.notification(title, None, message, icon=icon_path)
+        except TypeError:  # older rumps without an `icon` kwarg
+            rumps.notification(title, None, message)
     run_on_main(_post)
 
 
