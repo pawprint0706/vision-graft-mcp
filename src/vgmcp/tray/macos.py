@@ -502,9 +502,23 @@ def build_app():
     return _make_app_class()()
 
 
+def _hide_dock_icon() -> None:
+    """Run as a menu-bar-only (accessory) app: no Dock icon, no app menu.
+
+    Accessory (not Prohibited) so modal dialogs still work.
+    """
+    try:
+        from AppKit import NSApplication  # noqa: PLC0415
+
+        NSApplication.sharedApplication().setActivationPolicy_(1)  # Accessory
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def run_tray() -> None:
     host.start_background()
     app = build_app()
+    _hide_dock_icon()
     app._maybe_onboard()  # first-run notice (plan §7.9)
     app.run()
 
