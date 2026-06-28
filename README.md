@@ -2,6 +2,11 @@
 
 **English** · [한국어](README.ko.md)
 
+> ⚠️ **Work in progress.** This project is still under active development, and
+> this README will be revised again. Steps, commands, and behavior may change.
+
+
+
 Give a "blind" AI coding model an **eye**. Many fast or local LLMs can't see
 images — they only read your HTML/CSS/JSX, so they can't tell when a button is
 cut off or two elements overlap. VGMCP captures your screen, sends it to a
