@@ -42,7 +42,7 @@ pip install -e ".[macos,anthropic,openai]"   # macOS dev with cloud backends
 
 ```bash
 vgmcp            # resident tray app + embedded host (macOS)
-vgmcp --check    # print environment check result and exit
+vgmcp check      # print environment check result and exit
 vgmcp --no-tray  # run the HTTP host in the foreground (headless)
 ```
 
@@ -53,3 +53,44 @@ Register the adapter in your MCP client (e.g. Cursor):
 ```
 
 Requires Python ≥ 3.11. macOS target is **14 (Sonoma)+** (ScreenCaptureKit).
+
+## Vision providers (CLI)
+
+Until the tray management UI (M4) lands, providers are managed from the CLI.
+API keys go to the OS keychain (never to config); env vars
+(`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `OPENROUTER_API_KEY`) are honored as a
+fallback. The default provider is the first registered, then the last used
+(plan §7.3).
+
+```bash
+# Register a provider (key via env var — nothing stored)
+export ANTHROPIC_API_KEY="sk-ant-..."
+vgmcp provider add --type anthropic --set-default
+
+# Register with the key stored in the keychain
+vgmcp provider add --type openrouter --model "openai/gpt-4o" --key "sk-or-..." --set-default
+
+# Custom OpenAI-compatible endpoint
+vgmcp provider add --type custom --base-url "https://gateway.example/v1" \
+    --model "..." --key "..."
+
+vgmcp provider list                       # show providers (+ whether a key resolves)
+vgmcp provider update <id> --model "..."  # change type/model/base-url/key/default
+vgmcp provider remove <id>                # delete provider + its keychain key
+```
+
+`--type` is one of `anthropic | openai | openrouter | custom | ollama`
+(Ollama is local — no key, no external transmission). `openrouter`/`custom`
+require a `--model`; `custom` also requires `--base-url`.
+
+## Test the real vision loop
+
+```bash
+vgmcp capture-analyze --target monitor               # capture screen + analyze
+vgmcp capture-analyze --target region_interactive    # drag-select a region, then analyze
+vgmcp capture-analyze --target region --x 100 --y 100 --w 600 --h 400
+vgmcp analyze /path/to/screenshot.png                # analyze an existing image
+```
+
+Small regions are sent as-is; large captures are downscaled to a ~1568px long
+edge before transmission (plan §7.5).

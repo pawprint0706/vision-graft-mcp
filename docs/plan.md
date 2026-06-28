@@ -425,6 +425,7 @@ class VisionBackend(Protocol):
 - 트레이 메뉴 `설정 > 비전 백엔드 관리...`에서 provider 추가/수정/삭제, 기본값 수동 지정, 연결 테스트(샘플 호출) 제공.
 - 추가 다이얼로그: provider 유형 선택 → (클라우드) API 키·`base_url`(커스텀)·`model` 입력 / (Ollama) 호스트·모델 입력.
 - 키 입력 필드는 마스킹하며, 저장 시 §7.6의 OS 자격증명 저장소로 보낸다.
+- **CLI 대체 경로(트레이 UI 도입 전, M4 이전)**: 동일 로직을 CLI로 제공한다 — `vgmcp provider add|update|remove|list`. 키는 `--key`로 키체인에 저장하거나 환경변수 폴백 사용. 트레이 UI는 이 코어 로직을 그대로 호출한다. 실사용 예시는 `README.md` 참조.
 
 ### 7.5 이미지 전처리 (전송 전 다운스케일)
 

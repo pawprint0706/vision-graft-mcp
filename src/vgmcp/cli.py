@@ -77,6 +77,48 @@ def _cmd_provider_add(args) -> int:
     return 0
 
 
+def _cmd_provider_update(args) -> int:
+    config = cfg.load_config()
+    provider = config.get_provider(args.id)
+    if provider is None:
+        print(f"provider를 찾을 수 없습니다: {args.id}", file=sys.stderr)
+        return 1
+    if args.type is not None:
+        provider.type = args.type
+    if args.model is not None:
+        provider.model = args.model
+    if args.label is not None:
+        provider.label = args.label
+    if args.base_url is not None:
+        provider.base_url = args.base_url
+    if args.key is not None:
+        # Reuse the existing key_ref if present, else create one.
+        provider.key_ref = provider.key_ref or f"provider:{provider.id}"
+        credentials.set_key(provider.key_ref, args.key)
+    if args.set_default:
+        config.default_provider_id = provider.id
+    cfg.save_config(config)
+    print(json.dumps({"status": "ok", "updated": provider.id, "type": provider.type,
+                      "model": provider.model, "base_url": provider.base_url},
+                     ensure_ascii=False))
+    return 0
+
+
+def _cmd_provider_remove(args) -> int:
+    config = cfg.load_config()
+    provider = config.get_provider(args.id)
+    if provider is None:
+        print(f"provider를 찾을 수 없습니다: {args.id}", file=sys.stderr)
+        return 1
+    if provider.key_ref:
+        credentials.delete_key(provider.key_ref)
+    config.remove_provider(args.id)
+    cfg.save_config(config)
+    print(json.dumps({"status": "ok", "removed": args.id,
+                      "default": config.default_provider_id}, ensure_ascii=False))
+    return 0
+
+
 def _cmd_provider_list(_args) -> int:
     config = cfg.load_config()
     out = {
@@ -139,6 +181,22 @@ def main(argv: list[str] | None = None) -> int:
     p_add.add_argument("--key", help="API 키 (미지정 시 환경변수 사용; 키체인에 저장)")
     p_add.add_argument("--set-default", action="store_true")
     p_add.set_defaults(func=_cmd_provider_add)
+
+    p_upd = prov_sub.add_parser("update", help="provider 수정")
+    p_upd.add_argument("id")
+    p_upd.add_argument("--type",
+                       choices=["anthropic", "openai", "openrouter", "custom", "ollama"])
+    p_upd.add_argument("--model")
+    p_upd.add_argument("--label")
+    p_upd.add_argument("--base-url", dest="base_url")
+    p_upd.add_argument("--key", help="API 키 교체 (키체인에 저장)")
+    p_upd.add_argument("--set-default", action="store_true")
+    p_upd.set_defaults(func=_cmd_provider_update)
+
+    p_rm = prov_sub.add_parser("remove", help="provider 삭제 (키체인 키도 삭제)")
+    p_rm.add_argument("id")
+    p_rm.set_defaults(func=_cmd_provider_remove)
+
     prov_sub.add_parser("list", help="등록된 provider 목록").set_defaults(func=_cmd_provider_list)
 
     p_an = sub.add_parser("analyze", help="이미지 파일 비전 분석")
