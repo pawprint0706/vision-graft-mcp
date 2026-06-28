@@ -365,6 +365,13 @@ Install Python from [python.org/downloads](https://www.python.org/downloads/).
 .venv/bin/ruff check src/ tests/   # lint
 ```
 
+- **Custom tray icon:** the menu-bar icon is generated from a single SVG at
+  `src/vgmcp/assets/aperture.svg`. Replace that file with your own line-art SVG
+  (keep `stroke="#000000"` so recoloring works) — VGMCP renders three states
+  from it: a black **template** image for normal (auto black/white by light/dark
+  mode) and **amber/red** versions for the warning/error states. Adjust the
+  render resolution with `icon_size` in `~/.config/vgmcp/config.json`. Cached
+  PNGs live in `~/.config/vgmcp/icons/` (delete them to regenerate).
 - Architecture, milestones, and the full spec: [`docs/plan.md`](docs/plan.md);
   original concept: [`docs/idea.md`](docs/idea.md).
 - The tray app hosts a loopback MCP server (`127.0.0.1:8765`) holding the shared

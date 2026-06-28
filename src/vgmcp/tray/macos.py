@@ -67,7 +67,7 @@ def _make_app_class():
 
     class VGMCPApp(rumps.App):
         def __init__(self) -> None:
-            super().__init__("VGMCP", title=_ICON["gray"], quit_button="종료")
+            super().__init__("VGMCP", title=None, icon=None, quit_button="종료")
             self.checker = EnvironmentChecker()
             self.cap_menu = rumps.MenuItem("캡처")
             self.recent_menu = rumps.MenuItem("최근 이미지")
@@ -134,13 +134,29 @@ def _make_app_class():
                 print(f"[vgmcp tray] refresh error: {exc}")
 
         def _refresh_status(self) -> None:
-            full = self.checker.check_full()
-            if full.ok:
-                self.title = _ICON["green"]
+            if self.checker.check_full().ok:
+                color = "green"
             elif self.checker.check_for_capture().ok:
-                self.title = _ICON["yellow"]  # capture works, provider/cred missing
+                color = "yellow"  # capture works, provider/cred missing
             else:
-                self.title = _ICON["red"]
+                color = "red"
+            self._set_status_icon(color)
+
+        def _set_status_icon(self, color: str) -> None:
+            from ..core import icons  # noqa: PLC0415
+
+            size = cfg.load_config().icon_size
+            try:
+                path, template = icons.icon_for_status(color, size)
+            except Exception:  # noqa: BLE001
+                path, template = None, False
+            if path is not None:
+                self.template = template
+                self.icon = str(path)
+                self.title = None
+            else:  # fallback to an emoji glyph if rasterization is unavailable
+                self.icon = None
+                self.title = _ICON.get(color, _ICON["gray"])
 
         def _refresh_capture_menu(self) -> None:
             from ..capture import get_capture_backend  # noqa: PLC0415

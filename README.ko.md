@@ -363,6 +363,13 @@ Ollama를 실행(`ollama serve`)하고 모델을 받았는지 확인하세요
 .venv/bin/ruff check src/ tests/   # 린트
 ```
 
+- **트레이 아이콘 교체:** 메뉴바 아이콘은 `src/vgmcp/assets/aperture.svg` 하나의
+  SVG에서 생성됩니다. 이 파일을 원하는 라인아트 SVG로 바꾸면 됩니다
+  (`stroke="#000000"`를 유지해야 재색칠이 동작). VGMCP는 여기서 3개 상태를
+  렌더링합니다 — 정상은 검정 **템플릿** 이미지(라이트/다크에 따라 자동 흑/백),
+  경고/오류는 **호박색/빨강** 버전. 렌더 해상도는
+  `~/.config/vgmcp/config.json`의 `icon_size`로 조절합니다. 생성된 PNG는
+  `~/.config/vgmcp/icons/`에 캐시됩니다(삭제하면 다시 생성).
 - 아키텍처·마일스톤·전체 명세: [`docs/plan.md`](docs/plan.md);
   최초 아이디어: [`docs/idea.md`](docs/idea.md).
 - 트레이 앱은 루프백 MCP 호스트(`127.0.0.1:8765`)를 띄우며 공유 코어(캡처/

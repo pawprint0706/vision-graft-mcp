@@ -56,6 +56,12 @@ def test_backend_submenu_reflects_default(app):
     assert "추가..." in keys
 
 
-def test_status_green_when_configured(app):
-    # ollama provider + capture available -> environment ok -> green
-    assert app.title == "🟢"
+def test_status_uses_svg_icon(app):
+    # ollama provider + capture available -> environment ok -> normal (template) icon
+    from pathlib import Path
+
+    assert app.icon is not None
+    assert Path(app.icon).exists()
+    assert "normal" in Path(app.icon).name
+    assert app.template is True  # normal icon is a template (auto light/dark)
+    assert app.title is None

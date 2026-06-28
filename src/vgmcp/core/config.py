@@ -55,6 +55,9 @@ class AppConfig(BaseModel):
     recent_images: list[str] = Field(default_factory=list)
     recent_limit: int = 10
 
+    # Menu-bar status icon render size in px (displayed at ~20pt; plan §4.3)
+    icon_size: int = 36
+
     # Image preprocessing (plan §7.5)
     max_long_edge: int = 1568
     downscale: str = "auto"  # "auto" | "off"
