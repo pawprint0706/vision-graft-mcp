@@ -36,30 +36,43 @@ _RECOMMENDED_LABEL = {"anthropic": "claude-sonnet-4-6", "openai": "gpt-4o",
 # --------------------------------------------------------------------------- #
 # Dialog helpers (AppKit)
 # --------------------------------------------------------------------------- #
-def _blank_icon_path() -> str:
+def _aperture_nsimage(size: int, template: bool):
+    """Load our aperture icon as an NSImage. As a template image it adapts to the
+    dialog's light/dark appearance (so it's visible on both)."""
     from ..core import icons  # noqa: PLC0415
 
-    return str(icons.blank_icon())
-
-
-def _hide_alert_icon(alert) -> None:
-    """Replace a dialog's default (Python) app icon with a transparent one."""
     try:
         from AppKit import NSImage  # noqa: PLC0415
+    except ImportError:
+        return None
+    path = icons.get_icon("normal", size)
+    if path is None:
+        return None
+    img = NSImage.alloc().initByReferencingFile_(str(path))
+    if img is not None:
+        img.setTemplate_(template)
+    return img
 
-        img = NSImage.alloc().initByReferencingFile_(_blank_icon_path())
-        if img is not None:
-            alert.setIcon_(img)
-    except Exception:  # noqa: BLE001
-        pass
+
+def _brand_alert_icon(alert) -> None:
+    """Replace a dialog's default (Python) app icon with our aperture icon."""
+    img = _aperture_nsimage(64, template=True)
+    if img is not None:
+        alert.setIcon_(img)
 
 
 def _alert(title: str, message: str, ok: str = "확인", cancel=None) -> int:
-    """rumps.alert with the default app icon hidden."""
-    import rumps  # noqa: PLC0415
+    """A native NSAlert (so we can brand the icon). Returns 1 for ok, 0 for cancel."""
+    from AppKit import NSAlert  # noqa: PLC0415
 
-    return rumps.alert(title=title, message=message, ok=ok, cancel=cancel,
-                       icon_path=_blank_icon_path())
+    alert = NSAlert.alloc().init()
+    alert.setMessageText_(title)
+    alert.setInformativeText_(message)
+    alert.addButtonWithTitle_(ok)
+    if cancel:
+        alert.addButtonWithTitle_(cancel)
+    _brand_alert_icon(alert)
+    return 1 if alert.runModal() == 1000 else 0
 
 
 def _text_input(message: str, title: str = "VGMCP", default: str = "",
@@ -68,7 +81,7 @@ def _text_input(message: str, title: str = "VGMCP", default: str = "",
 
     win = rumps.Window(message=message, title=title, default_text=default,
                        ok="확인", cancel="취소", dimensions=(360, 120), secure=secure)
-    _hide_alert_icon(win._alert)
+    _brand_alert_icon(win._alert)
     resp = win.run()
     return resp.text.strip() if resp.clicked else None
 
@@ -92,7 +105,7 @@ def _choose_from_list(message: str, title: str, options: list[str],
     if 0 <= default_index < len(options):
         popup.selectItemAtIndex_(default_index)
     alert.setAccessoryView_(popup)
-    _hide_alert_icon(alert)
+    _brand_alert_icon(alert)
     if alert.runModal() == 1000:  # NSAlertFirstButtonReturn (확인)
         return popup.titleOfSelectedItem()
     return None
@@ -383,7 +396,7 @@ def _make_app_class():
                 dimensions=(540, 360),
             )
             win.add_button("클립보드에 복사")
-            _hide_alert_icon(win._alert)
+            _brand_alert_icon(win._alert)
             resp = win.run()
             if resp.clicked == 2:  # the extra "클립보드에 복사" button
                 ok = clipboard.copy_to_clipboard(resp.text or text)
@@ -532,7 +545,12 @@ def _hide_dock_icon() -> None:
     try:
         from AppKit import NSApplication  # noqa: PLC0415
 
-        NSApplication.sharedApplication().setActivationPolicy_(1)  # Accessory
+        app = NSApplication.sharedApplication()
+        app.setActivationPolicy_(1)  # Accessory
+        # If a Dock icon ever does appear, show our aperture (not the Python icon).
+        img = _aperture_nsimage(256, template=False)
+        if img is not None:
+            app.setApplicationIconImage_(img)
     except Exception:  # noqa: BLE001
         pass
 

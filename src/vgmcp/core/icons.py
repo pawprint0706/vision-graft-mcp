@@ -110,16 +110,6 @@ def icon_for_status(status_color: str, size: int = DEFAULT_SIZE) -> tuple[Path |
     return get_icon(state, size), is_template(state)
 
 
-def blank_icon(size: int = 64) -> Path:
-    """A fully transparent PNG, used to hide the default app icon inside dialogs."""
-    dest = _icons_dir() / f"blank_{size}.png"
-    if not dest.exists():
-        from PIL import Image  # noqa: PLC0415
-
-        Image.new("RGBA", (size, size), (0, 0, 0, 0)).save(dest)
-    return dest
-
-
 def pregenerate(size: int = DEFAULT_SIZE) -> dict[str, Path | None]:
     """Generate all state icons once up front (called at app launch) so switching
     states later is a cached file lookup, never a live conversion."""
