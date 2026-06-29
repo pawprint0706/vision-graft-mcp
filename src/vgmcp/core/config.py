@@ -89,6 +89,19 @@ class AppConfig(BaseModel):
         self.last_used_provider_id = provider_id
         self.default_provider_id = provider_id
 
+    def set_default_provider(self, provider_id: str) -> bool:
+        """Explicitly choose the default backend (tray 'Set as default' / CLI).
+
+        effective_default() prioritizes last_used_provider_id, so an explicit
+        choice MUST also pin last_used — otherwise a previously-used backend keeps
+        winning and the user's selection silently has no effect.
+        """
+        if self.get_provider(provider_id) is None:
+            return False
+        self.default_provider_id = provider_id
+        self.last_used_provider_id = provider_id
+        return True
+
     def set_consent(self, provider_id: str, consented: bool) -> bool:
         """Grant/revoke external-transmission consent for a provider (plan §7.9)."""
         p = self.get_provider(provider_id)

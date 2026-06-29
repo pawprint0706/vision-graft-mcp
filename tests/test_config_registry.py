@@ -28,6 +28,31 @@ def test_last_used_overrides_default():
     assert cfg.last_used_provider_id == "b"
 
 
+def test_set_default_provider_overrides_last_used():
+    """Regression: explicitly setting the default must beat a prior last-used.
+
+    Scenario: OpenRouter was used (so last_used=openrouter), then the user picks
+    Ollama as default in the tray. effective_default() prioritizes last_used, so
+    set_default_provider must also pin last_used or the choice has no effect.
+    """
+    cfg = AppConfig()
+    cfg.add_provider(_p("openrouter", "openrouter"))
+    cfg.add_provider(_p("ollama", "ollama"))
+    cfg.mark_used("openrouter")            # prior analysis ran on OpenRouter
+    assert cfg.effective_default().id == "openrouter"
+
+    assert cfg.set_default_provider("ollama") is True
+    assert cfg.effective_default().id == "ollama"   # the explicit choice wins
+    assert cfg.last_used_provider_id == "ollama"
+
+
+def test_set_default_provider_unknown_id():
+    cfg = AppConfig()
+    cfg.add_provider(_p("a"))
+    assert cfg.set_default_provider("nope") is False
+    assert cfg.effective_default().id == "a"
+
+
 def test_remove_default_reassigns():
     cfg = AppConfig()
     cfg.add_provider(_p("a"))

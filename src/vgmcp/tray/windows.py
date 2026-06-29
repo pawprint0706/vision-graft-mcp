@@ -739,7 +739,7 @@ class WindowsTrayApp:
     def _make_setdefault_cb(self, pid: str):
         def cb(_icon=None, _item=None) -> None:
             config = cfg.load_config()
-            config.default_provider_id = pid
+            config.set_default_provider(pid)  # also pins last_used so it takes effect
             cfg.save_config(config)
             self._refresh()
         return cb

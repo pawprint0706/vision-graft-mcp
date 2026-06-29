@@ -509,7 +509,7 @@ def _make_app_class():
         def _make_setdefault_cb(self, pid: str):
             def cb(_=None) -> None:
                 config = cfg.load_config()
-                config.default_provider_id = pid
+                config.set_default_provider(pid)  # also pins last_used so it takes effect
                 cfg.save_config(config)
                 self._refresh_backend_menu()
             return cb

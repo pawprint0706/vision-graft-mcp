@@ -84,7 +84,7 @@ def _cmd_provider_add(args) -> int:
     )
     config.add_provider(provider)
     if args.set_default:
-        config.default_provider_id = pid
+        config.set_default_provider(pid)  # also pins last_used so it takes effect
     cfg.save_config(config)
     print(json.dumps({"status": "ok", "added": pid, "default": config.default_provider_id},
                      ensure_ascii=False))
@@ -111,7 +111,7 @@ def _cmd_provider_update(args) -> int:
         provider.key_ref = provider.key_ref or f"provider:{provider.id}"
         credentials.set_key(provider.key_ref, key_value)
     if args.set_default:
-        config.default_provider_id = provider.id
+        config.set_default_provider(provider.id)  # also pins last_used so it takes effect
     cfg.save_config(config)
     print(json.dumps({"status": "ok", "updated": provider.id, "type": provider.type,
                       "model": provider.model, "base_url": provider.base_url},
