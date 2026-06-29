@@ -73,8 +73,10 @@ def test_think_unsupported_retries_without_think(monkeypatch):
 
     def fake_post(url, json=None, timeout=None):
         calls.append(json)
-        if "think" in json:  # first attempt — pretend the model rejects it
-            return _Resp({}, status=400, text="model does not support thinking")
+        # First attempt rejected with a 400 whose text does NOT mention "think" —
+        # the retry must still trigger (text-independent) for plain VLMs.
+        if "think" in json:
+            return _Resp({}, status=400, text="bad request")
         return _Resp({"message": {"content": '{"summary":"s","issues":[]}'}})
 
     monkeypatch.setattr(ollama_backend.httpx, "post", fake_post)
@@ -83,6 +85,21 @@ def test_think_unsupported_retries_without_think(monkeypatch):
     assert len(calls) == 2
     assert "think" not in calls[1]                 # retried without the field
     assert out == '{"summary":"s","issues":[]}'
+
+
+def test_persistent_400_surfaces_error(monkeypatch):
+    # A genuine 400 (not the think field) must not loop: retry once, then raise.
+    calls = []
+
+    def fake_post(url, json=None, timeout=None):
+        calls.append(json)
+        return _Resp({}, status=400, text="invalid image")
+
+    monkeypatch.setattr(ollama_backend.httpx, "post", fake_post)
+    with pytest.raises(VisionError) as ei:
+        _backend()._complete(b"img", "image/png", "p")
+    assert len(calls) == 2                          # one retry, then give up
+    assert ei.value.code == VisionErrorCode.BAD_REQUEST
 
 
 def test_model_not_found_maps_to_ollama_unavailable(monkeypatch):

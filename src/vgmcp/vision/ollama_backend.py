@@ -59,13 +59,10 @@ class OllamaBackend(BaseVisionBackend):
                 f"Cannot connect to the local Ollama server ({self.host}).",
             ) from exc
         except httpx.HTTPStatusError as exc:
-            # Older Ollama / non-reasoning models can reject the `think` field —
-            # retry once without it rather than failing the analysis.
-            if (
-                "think" in body
-                and exc.response.status_code == 400
-                and "think" in exc.response.text.lower()
-            ):
+            # Non-reasoning models / older Ollama may reject the `think` field with
+            # a 400. Retry once without it (text-independent, since the exact error
+            # wording varies by version) so plain VLMs like llava still work.
+            if "think" in body and exc.response.status_code == 400:
                 return self._chat({k: v for k, v in body.items() if k != "think"})
             if exc.response.status_code == 404:
                 raise VisionError(
