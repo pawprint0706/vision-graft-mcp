@@ -6,10 +6,15 @@ background thread and exposes capture / analyze / settings / recent /
 backend-management from the tray menu. Dynamic submenus (monitors, windows,
 recent, providers) and the status icon refresh on a timer.
 
-Threading model: pystray's message loop runs on the main thread (run_tray →
-icon.run()); menu callbacks fire on pystray's worker thread. Each dialog and the
-region-select overlay create a transient Tk within the calling thread, which is
-consistent and safe because menu clicks are serialized.
+Threading model: tkinter is NOT thread-safe, so all Tk work must run on the main
+thread. run_tray() runs the pystray icon detached (its own thread) and turns the
+main thread into a UI dispatch loop (_ui_loop). Menu callbacks fire on pystray's
+worker thread and marshal any dialog / region-overlay work to the main thread via
+_ui_call (blocking until it returns). Simple alerts use native Win32 message
+boxes, which work from any thread, so they skip the marshaling entirely.
+
+(Earlier versions created Tk on the worker thread directly; dialogs there render
+but their buttons never respond because that thread has no Tk event loop.)
 
 UI strings are localized via core.i18n.tr (Korean if the OS prefers Korean,
 otherwise English).
@@ -17,7 +22,9 @@ otherwise English).
 
 from __future__ import annotations
 
+import functools
 import json
+import queue
 import threading
 from pathlib import Path
 
@@ -99,7 +106,57 @@ def _status_image(color: str, size: int = 64):
 
 
 # --------------------------------------------------------------------------- #
-# tkinter dialog helpers (each creates a transient hidden root)
+# Main-thread UI marshaling
+# --------------------------------------------------------------------------- #
+_ui_queue: "queue.Queue" = queue.Queue()
+_QUIT = object()
+
+
+def _ui_loop() -> None:
+    """Run on the main thread: execute queued UI jobs until quit (run_tray)."""
+    while True:
+        job = _ui_queue.get()
+        if job is _QUIT:
+            return
+        job()
+
+
+def _ui_call(fn):
+    """Run fn() on the main UI thread and return its result (blocking).
+
+    Called inline if we're already on the main thread; otherwise the job is
+    queued for _ui_loop and the caller blocks until it finishes.
+    """
+    if threading.current_thread() is threading.main_thread():
+        return fn()
+    box: dict = {}
+    done = threading.Event()
+
+    def job() -> None:
+        try:
+            box["result"] = fn()
+        except BaseException as exc:  # noqa: BLE001 — re-raised on the caller thread
+            box["error"] = exc
+        finally:
+            done.set()
+
+    _ui_queue.put(job)
+    done.wait()
+    if "error" in box:
+        raise box["error"]
+    return box.get("result")
+
+
+def _on_ui(fn):
+    """Decorator: always execute the wrapped tkinter dialog on the main thread."""
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        return _ui_call(lambda: fn(*args, **kwargs))
+    return wrapper
+
+
+# --------------------------------------------------------------------------- #
+# Dialog helpers
 # --------------------------------------------------------------------------- #
 def _new_root():
     import tkinter as tk  # noqa: PLC0415
@@ -111,30 +168,25 @@ def _new_root():
 
 
 def _alert(title: str, message: str, kind: str = "info") -> None:
-    from tkinter import messagebox  # noqa: PLC0415
+    """Native Win32 message box — works from any thread (no Tk event loop needed)."""
+    import ctypes  # noqa: PLC0415
 
-    root = _new_root()
-    try:
-        if kind == "error":
-            messagebox.showerror(title, message, parent=root)
-        elif kind == "warning":
-            messagebox.showwarning(title, message, parent=root)
-        else:
-            messagebox.showinfo(title, message, parent=root)
-    finally:
-        root.destroy()
+    # MB_ICON*: error 0x10, warning 0x30, info 0x40; topmost+setforeground to surface.
+    icon_flag = {"error": 0x10, "warning": 0x30, "info": 0x40}.get(kind, 0x40)
+    flags = 0x0 | icon_flag | 0x00040000 | 0x00010000  # MB_OK | icon | TOPMOST | SETFOREGROUND
+    ctypes.windll.user32.MessageBoxW(0, str(message), str(title), flags)
 
 
 def _confirm(title: str, message: str) -> bool:
-    from tkinter import messagebox  # noqa: PLC0415
+    """Native Win32 OK/Cancel box — works from any thread. True if OK."""
+    import ctypes  # noqa: PLC0415
 
-    root = _new_root()
-    try:
-        return bool(messagebox.askyesno(title, message, parent=root))
-    finally:
-        root.destroy()
+    # MB_OKCANCEL 0x1 | MB_ICONQUESTION 0x20 | TOPMOST | SETFOREGROUND
+    flags = 0x1 | 0x20 | 0x00040000 | 0x00010000
+    return ctypes.windll.user32.MessageBoxW(0, str(message), str(title), flags) == 1  # IDOK
 
 
+@_on_ui
 def _text_input(message: str, title: str = "VGMCP", default: str = "",
                 secure: bool = False) -> str | None:
     from tkinter import simpledialog  # noqa: PLC0415
@@ -149,6 +201,7 @@ def _text_input(message: str, title: str = "VGMCP", default: str = "",
         root.destroy()
 
 
+@_on_ui
 def _choose_from_list(message: str, title: str, options: list[str],
                       default_index: int = 0) -> str | None:
     """Dropdown selection dialog (so the user picks from a list, avoiding typos)."""
@@ -191,6 +244,7 @@ def _choose_from_list(message: str, title: str, options: list[str],
     return chosen["value"]
 
 
+@_on_ui
 def _pick_dir() -> str | None:
     from tkinter import filedialog  # noqa: PLC0415
 
@@ -202,6 +256,7 @@ def _pick_dir() -> str | None:
         root.destroy()
 
 
+@_on_ui
 def _pick_file() -> str | None:
     from tkinter import filedialog  # noqa: PLC0415
 
@@ -216,6 +271,7 @@ def _pick_file() -> str | None:
         root.destroy()
 
 
+@_on_ui
 def _show_result(res: dict, text: str) -> None:
     """Scrollable result window with a Copy button (peer of macOS _show_result)."""
     from tkinter import scrolledtext, ttk  # noqa: PLC0415
@@ -425,7 +481,12 @@ class WindowsTrayApp:
         self._capture(target="region_interactive")
 
     def _capture(self, **kwargs) -> None:
-        result = perform_capture(**kwargs)
+        # The interactive region overlay is Tk, so it must run on the main thread;
+        # monitor/window/region captures have no UI and run on the caller thread.
+        if kwargs.get("target") == "region_interactive":
+            result = _ui_call(lambda: perform_capture(**kwargs))
+        else:
+            result = perform_capture(**kwargs)
         status = result.get("status")
         if status == "ok":
             self._refresh()  # success is silent
@@ -666,13 +727,17 @@ class WindowsTrayApp:
     def _on_quit(self, _icon=None, _item=None) -> None:
         self._stop.set()
         self.icon.stop()
+        _ui_queue.put(_QUIT)  # release the main-thread UI loop
 
     def run(self) -> None:
         threading.Thread(target=self._timer_loop, name="vgmcp-tray-refresh",
                          daemon=True).start()
-        # Show the first-run notice shortly after the loop starts.
+        # Show the first-run notice shortly after startup (native box, any thread).
         threading.Timer(0.5, self.maybe_onboard).start()
-        self.icon.run()
+        # Icon on its own thread; the main thread becomes the Tk dispatch loop so
+        # dialog buttons actually respond (see module docstring).
+        self.icon.run_detached()
+        _ui_loop()
 
 
 def build_app() -> WindowsTrayApp:
