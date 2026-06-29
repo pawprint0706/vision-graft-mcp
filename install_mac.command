@@ -16,6 +16,13 @@ msg "   Vision-Graft MCP (VGMCP) 설치" "   Vision-Graft MCP (VGMCP) installer"
 echo "════════════════════════════════════════"
 echo ""
 
+# 0) stop any running instance so files update cleanly (full reinstall) --------
+# Matches both ".venv/bin/vgmcp" (tray) and ".venv/bin/vgmcp-adapter" (stdio bridge).
+if pkill -f "bin/vgmcp" 2>/dev/null; then
+  msg "• 기존 실행 중인 VGMCP를 종료했습니다." "• Stopped a running VGMCP instance."
+  sleep 1
+fi
+
 # 1) Python 3.11+ -------------------------------------------------------------
 if ! command -v python3 >/dev/null 2>&1; then
   msg "✗ python3 가 설치되어 있지 않습니다." "✗ python3 is not installed."

@@ -15,6 +15,25 @@ if (-not (Test-Path ".\.venv\Scripts\vgmcp.exe")) {
     exit 1
 }
 
+# Full restart: stop any tray/adapter instance already running (vgmcp.exe,
+# vgmcp-adapter.exe, or "pythonw -m vgmcp"). Skips this script's own process.
+$stopped = $false
+Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+    Where-Object {
+        $_.ProcessId -ne $PID -and (
+            $_.Name -in @("vgmcp.exe", "vgmcp-adapter.exe") -or
+            ($_.CommandLine -and $_.CommandLine -match "\bvgmcp\b")
+        )
+    } |
+    ForEach-Object {
+        Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+        $stopped = $true
+    }
+if ($stopped) {
+    Msg "• 기존 실행 중인 VGMCP를 종료했습니다." "• Stopped a running VGMCP instance."
+    Start-Sleep -Milliseconds 700
+}
+
 # Launch console-less (pythonw -m vgmcp) and detached so this window can close.
 $pythonw = ".\.venv\Scripts\pythonw.exe"
 if (Test-Path $pythonw) {

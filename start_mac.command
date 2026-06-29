@@ -15,6 +15,13 @@ if [ ! -x ".venv/bin/vgmcp" ]; then
   exit 1
 fi
 
+# Full restart: stop any tray/adapter instance already running (ignore if none).
+# Matches both ".venv/bin/vgmcp" (tray) and ".venv/bin/vgmcp-adapter" (stdio bridge).
+if pkill -f "bin/vgmcp" 2>/dev/null; then
+  msg "• 기존 실행 중인 VGMCP를 종료했습니다." "• Stopped a running VGMCP instance."
+  sleep 1
+fi
+
 # Launch detached so this Terminal window can be closed.
 nohup ./.venv/bin/vgmcp >/dev/null 2>&1 &
 msg "✅ VGMCP를 메뉴바에 실행했습니다. (화면 오른쪽 위의 조리개 아이콘)" \

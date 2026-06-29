@@ -17,6 +17,37 @@ from ..core.models import VisionResult
 from ..vision import build_backend
 
 
+def build_self_analysis(image_path: Path, prompt: str) -> Any:
+    """Return the image to the caller for self-analysis (plan §5.3, self_analyze).
+
+    For callers that can already see images (vision-capable LLMs), skip every
+    external vision backend entirely — no transmission, no consent, no API key —
+    and hand the screenshot straight back as MCP image content plus an
+    instruction to analyze it directly. Returns a list of content blocks
+    (Image + text) on success, or a structured error dict if the file is missing.
+    """
+    if not image_path.exists():
+        return {
+            "status": "error",
+            "message": f"Image not found: {image_path}",
+        }
+
+    from fastmcp.utilities.types import Image  # noqa: PLC0415
+
+    from ..core.imaging import preprocess  # noqa: PLC0415
+
+    data, mime, _w, _h = preprocess(image_path)
+    fmt = mime.split("/", 1)[-1]  # "image/png" -> "png"
+
+    instruction = (
+        "You are a vision-capable model, so analyze this image yourself instead of "
+        "routing it to an external vision backend. The screenshot is attached below "
+        f"and also saved at: {image_path}\n\n"
+        f"Task: {prompt}"
+    )
+    return [Image(data=data, format=fmt), instruction]
+
+
 def run_analysis(image_path: Path, prompt: str, backend_id: str | None) -> dict[str, Any]:
     config = cfg.load_config()
 

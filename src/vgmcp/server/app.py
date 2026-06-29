@@ -22,7 +22,18 @@ mcp: FastMCP = FastMCP(
         "the user reports a UI issue, capture the screen with take_screenshot, "
         "then analyze it with analyze_vision and trust the returned report as if "
         "you saw it yourself. Never finish a UI fix on a guess. If a tool returns "
-        "status=environment_incomplete, relay the guide to the user, wait, then retry."
+        "status=environment_incomplete, relay the guide to the user, wait, then retry.\n\n"
+        "Screen capture: whenever you need a screenshot — a full monitor, a specific "
+        "app window, or a selected region — ALWAYS use take_screenshot (with "
+        "list_monitors / list_windows to pick a target). Do NOT write your own "
+        "one-off capture script (screencapture, mss, PIL.ImageGrab, PowerShell, "
+        "etc.); this server already handles every capture mode cross-platform, with "
+        "the user's permissions and the configured save folder. take_screenshot can "
+        "be used on its own — you are free to just capture without analyzing.\n\n"
+        "If you can already see images yourself (you are a vision-capable model), "
+        "you do not need an external vision backend: call analyze_vision with "
+        "self_analyze=true (or capture_and_analyze with self_analyze=true) to get the "
+        "image back and analyze it directly, instead of routing it to Ollama/Claude/OpenAI."
     ),
 )
 
@@ -90,11 +101,17 @@ def take_screenshot(
     w: int | None = None,
     h: int | None = None,
 ) -> dict[str, Any]:
-    """Capture the screen and save it to the target folder.
+    """Capture the screen and save it to the target folder, returning the saved path.
+
+    Use this for ANY screenshot need — do not write your own capture script
+    (screencapture / mss / PIL.ImageGrab / PowerShell); this tool covers every
+    capture mode cross-platform. It can be used standalone (just capture, no
+    analysis required).
 
     target:
-      - 'monitor'            : full screen of a monitor (monitor_index)
-      - 'window'             : a specific window (window_id, or app_name/title_contains selector)
+      - 'monitor'            : full screen of a monitor (monitor_index; see list_monitors)
+      - 'window'             : a specific app window (window_id, or app_name/title_contains
+                               selector; see list_windows)
       - 'region'             : coordinate region (x, y, w, h; pixels from the primary display's top-left)
       - 'region_interactive' : the user drag-selects a rectangle (requires user interaction)
 
@@ -115,7 +132,7 @@ def take_screenshot(
 # --------------------------------------------------------------------------- #
 # Vision (plan §5.3, §5.4) — implemented in M1
 # --------------------------------------------------------------------------- #
-@mcp.tool
+@mcp.tool(output_schema=None)
 def analyze_vision(
     image_path: str,
     prompt: str = (
@@ -123,17 +140,29 @@ def analyze_vision(
         "in this UI, and explain them with the likely CSS/style areas to fix."
     ),
     backend: str | None = None,
-) -> dict[str, Any]:
-    """Analyze an image (path + prompt) with the vision backend and return a structured report."""
+    self_analyze: bool = False,
+) -> Any:
+    """Analyze an image (path + prompt) with the vision backend and return a structured report.
+
+    self_analyze=true: if you are a vision-capable model, set this to skip the
+    external backend entirely. The image is returned to you (as image content
+    plus its saved path) so you can analyze it yourself — nothing is sent to
+    Ollama/Claude/OpenAI, so no consent or API key is needed.
+    """
+    target = Path(image_path).expanduser()
+    if self_analyze:
+        from .vision_service import build_self_analysis  # noqa: PLC0415
+
+        return build_self_analysis(target, prompt)
     env = EnvironmentChecker().check_for_vision(backend)
     if not env.ok:
         return env.to_guide()
     from .vision_service import run_analysis  # noqa: PLC0415
 
-    return run_analysis(Path(image_path).expanduser(), prompt, backend)
+    return run_analysis(target, prompt, backend)
 
 
-@mcp.tool
+@mcp.tool(output_schema=None)
 def capture_and_analyze(
     target: str = "monitor",
     monitor_index: int = 0,
@@ -146,15 +175,22 @@ def capture_and_analyze(
     h: int | None = None,
     prompt: str | None = None,
     backend: str | None = None,
-) -> dict[str, Any]:
-    """Convenience chain: capture then analyze (plan §5.4). `target` matches take_screenshot."""
+    self_analyze: bool = False,
+) -> Any:
+    """Convenience chain: capture then analyze (plan §5.4). `target` matches take_screenshot.
+
+    self_analyze=true: if you are a vision-capable model, capture then get the
+    image back to analyze yourself instead of routing it to an external backend.
+    """
     shot = take_screenshot(
         target=target, monitor_index=monitor_index, window_id=window_id,
         app_name=app_name, title_contains=title_contains, x=x, y=y, w=w, h=h
     )
     if shot.get("status") != "ok":
         return shot
-    kwargs: dict[str, Any] = {"image_path": shot["path"], "backend": backend}
+    kwargs: dict[str, Any] = {
+        "image_path": shot["path"], "backend": backend, "self_analyze": self_analyze,
+    }
     if prompt is not None:
         kwargs["prompt"] = prompt
     return analyze_vision(**kwargs)

@@ -17,6 +17,25 @@ Msg "   Vision-Graft MCP (VGMCP) 설치" "   Vision-Graft MCP (VGMCP) installer"
 Write-Host "========================================"
 Write-Host ""
 
+# 0) stop any running instance so files update cleanly (full reinstall) --------
+# Matches vgmcp.exe, vgmcp-adapter.exe, or "pythonw -m vgmcp"; skips this script.
+$stopped = $false
+Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+    Where-Object {
+        $_.ProcessId -ne $PID -and (
+            $_.Name -in @("vgmcp.exe", "vgmcp-adapter.exe") -or
+            ($_.CommandLine -and $_.CommandLine -match "\bvgmcp\b")
+        )
+    } |
+    ForEach-Object {
+        Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+        $stopped = $true
+    }
+if ($stopped) {
+    Msg "• 기존 실행 중인 VGMCP를 종료했습니다." "• Stopped a running VGMCP instance."
+    Start-Sleep -Milliseconds 700
+}
+
 # 1) Python 3.11+ -------------------------------------------------------------
 $python = $null
 foreach ($cmd in @("python", "py")) {
