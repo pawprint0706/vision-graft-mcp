@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastmcp.utilities.types import Image
 
-from vgmcp.core.imaging import stamp_verification_code
+from vgmcp.core.imaging import render_code_image
 from vgmcp.server import vision_service as vs
 
 
@@ -86,12 +86,14 @@ def test_analyze_vision_tool_reports_missing_file(tmp_path):
     assert out["status"] == "error" and out["code"] == "image_not_found"
 
 
-def test_stamp_is_legible_png(tmp_path):
+def test_code_image_is_small_standalone_png(tmp_path):
+    import io
+
     from PIL import Image as PILImage
 
-    src = _make_png(tmp_path, (800, 500))
-    data, mime = stamp_verification_code(src, "446TY")
+    data, mime = render_code_image("446TY")
     assert mime == "image/png" and len(data) > 0
-    # The on-disk original is untouched.
-    with PILImage.open(src) as orig:
-        assert orig.size == (800, 500)
+    # Dedicated small image (independent of any screenshot), so the capability
+    # check stays cheap regardless of capture size.
+    with PILImage.open(io.BytesIO(data)) as img:
+        assert max(img.size) <= 640

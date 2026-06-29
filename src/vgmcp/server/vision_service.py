@@ -57,26 +57,28 @@ def build_self_analysis(
     key = str(image_path)
 
     # --- Step 1: issue a capability challenge -------------------------------- #
+    # A tiny dedicated code image is sent (not the screenshot) so the capability
+    # check costs almost no tokens and the real image is transmitted only once,
+    # after verification.
     if vision_check is None:
-        from ..core.imaging import stamp_verification_code  # noqa: PLC0415
+        from ..core.imaging import render_code_image  # noqa: PLC0415
 
         code = _gen_code()
         _VISION_CHECKS[key] = code
-        data, mime = stamp_verification_code(image_path, code)
+        data, mime = render_code_image(code)
         instruction = (
-            "CAPABILITY CHECK — do not analyze the image yet.\n\n"
-            "A short verification code is printed in the red banner across the top "
-            "of this image. Read it, then call analyze_vision again with exactly:\n"
+            "CAPABILITY CHECK — this image is NOT your screenshot.\n\n"
+            "It shows only a short verification code. Read the code, then call "
+            "analyze_vision again with exactly:\n"
             f'  image_path   = "{image_path}"\n'
             "  self_analyze = true\n"
-            '  vision_check = "<the code from the banner>"\n'
-            "Analysis only proceeds once the code matches.\n\n"
-            "If you cannot actually see the code in the image, then you are a "
-            "text-only model and you cannot see this screenshot. Do NOT guess the "
-            "code, and do NOT invent any description of the image — fabricating "
-            "vision is always treated as failure and gains you nothing. Instead, "
-            "call analyze_vision again with self_analyze=false to route the image "
-            "to the configured vision backend."
+            '  vision_check = "<the code shown>"\n'
+            "Your screenshot is returned for analysis only after the code matches.\n\n"
+            "If you cannot read the code, then you are a text-only model and you "
+            "cannot see images. Do NOT guess the code, and do NOT invent any "
+            "description — fabricating vision is always treated as failure and "
+            "gains you nothing. Instead, call analyze_vision again with "
+            "self_analyze=false to route the image to the configured vision backend."
         )
         return [Image(data=data, format=mime.split("/", 1)[-1]), instruction]
 

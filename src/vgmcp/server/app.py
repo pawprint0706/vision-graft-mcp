@@ -32,9 +32,10 @@ mcp: FastMCP = FastMCP(
         "be used on its own — you are free to just capture without analyzing.\n\n"
         "If you can truly see images yourself (you are a vision-capable model), you "
         "may set self_analyze=true on analyze_vision/capture_and_analyze instead of "
-        "using an external backend. This runs a capability check: the image comes "
-        "back with a verification code stamped on it, which you must read and echo "
-        "via vision_check before analysis proceeds. Only set self_analyze=true if you "
+        "using an external backend. This runs a capability check: a small image "
+        "showing a verification code comes back, which you must read and echo via "
+        "vision_check before your screenshot is returned for analysis. Only set "
+        "self_analyze=true if you "
         "can actually see images — if you cannot read the code, do not guess it and "
         "do not invent a description (fabricating vision gains nothing); fall back to "
         "self_analyze=false to route the image to the configured vision backend."
@@ -150,9 +151,9 @@ def analyze_vision(
     """Analyze an image (path + prompt) with the vision backend and return a structured report.
 
     self_analyze=true: only for models that can actually see images. This does NOT
-    immediately analyze — it first returns the image with a verification code
-    stamped on it (a capability check). Read that code and call again with
-    vision_check set to it; analysis proceeds only if the code matches. If you
+    immediately analyze — it first returns a small image showing a verification
+    code (a capability check). Read that code and call again with vision_check set
+    to it; your screenshot is returned for analysis only if the code matches. If you
     cannot read the code you are not vision-capable: do not guess it (fabricating
     vision gains nothing) — call again with self_analyze=false to use the backend.
     """

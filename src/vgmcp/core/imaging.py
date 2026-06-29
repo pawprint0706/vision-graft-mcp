@@ -73,47 +73,34 @@ def _load_font(size: int):
         return ImageFont.load_default()
 
 
-def stamp_verification_code(
-    image_path: Path,
-    code: str,
-    *,
-    max_long_edge: int = 1568,
-) -> tuple[bytes, str]:
-    """Return ``(png_bytes, mime)`` of the (downscaled) image with a high-contrast
-    banner printing ``code`` across the top.
+def _draw_centered(draw, text, font, cx: int, cy: int, fill) -> None:
+    """Draw ``text`` centered on (cx, cy)."""
+    try:
+        box = draw.textbbox((0, 0), text, font=font)
+        tw, th = box[2] - box[0], box[3] - box[1]
+        draw.text((cx - tw // 2 - box[0], cy - th // 2 - box[1]), text,
+                  fill=fill, font=font)
+    except Exception:  # noqa: BLE001 — metrics are best-effort
+        draw.text((8, cy), text, fill=fill, font=font)
 
-    Used as a capability check: only a caller that can actually see the image can
-    read the code back. The original file on disk is never modified.
+
+def render_code_image(code: str, *, width: int = 480, height: int = 180) -> tuple[bytes, str]:
+    """Return ``(png_bytes, mime)`` of a small standalone image showing ``code``.
+
+    Used for the self_analyze capability check: only a caller that can actually
+    see images can read the code back. Rendering a tiny dedicated image (instead
+    of stamping the captured screenshot) avoids wasting tokens on a large image
+    sent purely to deliver a code, and sidesteps layout issues on odd sizes.
     """
     from PIL import Image, ImageDraw  # noqa: PLC0415
 
-    with Image.open(image_path) as img:
-        img.load()
-        img = img.convert("RGB")
-        w, h = img.size
-        long_edge = max(w, h)
-        if long_edge > max_long_edge:
-            scale = max_long_edge / long_edge
-            img = img.resize((max(1, round(w * scale)), max(1, round(h * scale))),
-                             Image.LANCZOS)
-            w, h = img.size
+    img = Image.new("RGB", (width, height), (15, 15, 18))
+    draw = ImageDraw.Draw(img)
+    _draw_centered(draw, "VISION CHECK CODE", _load_font(int(height * 0.16)),
+                   width // 2, int(height * 0.28), (180, 180, 190))
+    _draw_centered(draw, code, _load_font(int(height * 0.42)),
+                   width // 2, int(height * 0.62), (255, 90, 90))
 
-        band_h = max(36, h // 12)
-        font = _load_font(int(band_h * 0.6))
-        text = f"VISION CHECK CODE: {code}"
-
-        draw = ImageDraw.Draw(img)
-        # Solid banner so the code stays legible over any underlying pixels.
-        draw.rectangle([0, 0, w, band_h], fill=(0, 0, 0))
-        try:
-            box = draw.textbbox((0, 0), text, font=font)
-            tw, th = box[2] - box[0], box[3] - box[1]
-            tx = max(4, (w - tw) // 2 - box[0])
-            ty = max(0, (band_h - th) // 2 - box[1])
-        except Exception:  # noqa: BLE001 — metrics are best-effort
-            tx, ty = 8, 4
-        draw.text((tx, ty), text, fill=(255, 90, 90), font=font)
-
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        return buf.getvalue(), _MIME["PNG"]
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue(), _MIME["PNG"]
