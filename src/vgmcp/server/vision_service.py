@@ -17,35 +17,85 @@ from ..core.models import VisionResult
 from ..vision import build_backend
 
 
-def build_self_analysis(image_path: Path, prompt: str) -> Any:
-    """Return the image to the caller for self-analysis (plan §5.3, self_analyze).
+# Pending capability-check codes, keyed by resolved image path. A caller claiming
+# self-vision must read a code stamped into the image and echo it back before any
+# self-analysis is allowed — this blocks text-only models that merely *assert*
+# they can see and would otherwise hallucinate the image's contents.
+_VISION_CHECKS: dict[str, str] = {}
 
-    For callers that can already see images (vision-capable LLMs), skip every
-    external vision backend entirely — no transmission, no consent, no API key —
-    and hand the screenshot straight back as MCP image content plus an
-    instruction to analyze it directly. Returns a list of content blocks
-    (Image + text) on success, or a structured error dict if the file is missing.
+# Unambiguous code alphabet (no 0/O/1/I) so vision models transcribe reliably.
+_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+def _gen_code(length: int = 5) -> str:
+    import secrets  # noqa: PLC0415
+
+    return "".join(secrets.choice(_CODE_ALPHABET) for _ in range(length))
+
+
+def build_self_analysis(
+    image_path: Path,
+    prompt: str,
+    *,
+    vision_check: str | None = None,
+    backend_id: str | None = None,
+) -> Any:
+    """Gate self-analysis behind a capability check (plan §5.3, self_analyze).
+
+    First call (``vision_check is None``): stamp a random code into the image and
+    return it; the caller must read the code and call again with it. Second call:
+    if the echoed code matches, the caller genuinely sees the image, so the clean
+    image is returned for self-analysis. If it does not match — i.e. the caller is
+    a text-only model that cannot actually see and would fabricate a description —
+    fall back to the configured vision backend instead of trusting it.
     """
     if not image_path.exists():
-        return {
-            "status": "error",
-            "message": f"Image not found: {image_path}",
-        }
+        return {"status": "error", "message": f"Image not found: {image_path}"}
 
     from fastmcp.utilities.types import Image  # noqa: PLC0415
 
-    from ..core.imaging import preprocess  # noqa: PLC0415
+    key = str(image_path)
 
-    data, mime, _w, _h = preprocess(image_path)
-    fmt = mime.split("/", 1)[-1]  # "image/png" -> "png"
+    # --- Step 1: issue a capability challenge -------------------------------- #
+    if vision_check is None:
+        from ..core.imaging import stamp_verification_code  # noqa: PLC0415
 
-    instruction = (
-        "You are a vision-capable model, so analyze this image yourself instead of "
-        "routing it to an external vision backend. The screenshot is attached below "
-        f"and also saved at: {image_path}\n\n"
-        f"Task: {prompt}"
-    )
-    return [Image(data=data, format=fmt), instruction]
+        code = _gen_code()
+        _VISION_CHECKS[key] = code
+        data, mime = stamp_verification_code(image_path, code)
+        instruction = (
+            "CAPABILITY CHECK — do not analyze the image yet.\n\n"
+            "A short verification code is printed in the red banner across the top "
+            "of this image. Read it, then call analyze_vision again with exactly:\n"
+            f'  image_path   = "{image_path}"\n'
+            "  self_analyze = true\n"
+            '  vision_check = "<the code from the banner>"\n'
+            "Analysis only proceeds once the code matches.\n\n"
+            "If you cannot actually see the code in the image, then you are a "
+            "text-only model and you cannot see this screenshot. Do NOT guess the "
+            "code, and do NOT invent any description of the image — fabricating "
+            "vision is always treated as failure and gains you nothing. Instead, "
+            "call analyze_vision again with self_analyze=false to route the image "
+            "to the configured vision backend."
+        )
+        return [Image(data=data, format=mime.split("/", 1)[-1]), instruction]
+
+    # --- Step 2: verify the echoed code ------------------------------------- #
+    expected = _VISION_CHECKS.pop(key, None)
+    if expected and vision_check.strip().upper() == expected:
+        from ..core.imaging import preprocess  # noqa: PLC0415
+
+        data, mime, _w, _h = preprocess(image_path)
+        instruction = (
+            "Verification passed — you can see this image. Analyze it yourself now "
+            "and report concretely what you actually observe.\n\n"
+            f"Task: {prompt}"
+        )
+        return [Image(data=data, format=mime.split("/", 1)[-1]), instruction]
+
+    # Wrong/absent code: the caller cannot truly see the image. Do not let it
+    # self-analyze — route to the real backend instead.
+    return run_analysis(image_path, prompt, backend_id)
 
 
 def run_analysis(image_path: Path, prompt: str, backend_id: str | None) -> dict[str, Any]:

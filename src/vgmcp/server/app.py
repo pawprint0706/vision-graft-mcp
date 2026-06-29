@@ -30,10 +30,14 @@ mcp: FastMCP = FastMCP(
         "etc.); this server already handles every capture mode cross-platform, with "
         "the user's permissions and the configured save folder. take_screenshot can "
         "be used on its own — you are free to just capture without analyzing.\n\n"
-        "If you can already see images yourself (you are a vision-capable model), "
-        "you do not need an external vision backend: call analyze_vision with "
-        "self_analyze=true (or capture_and_analyze with self_analyze=true) to get the "
-        "image back and analyze it directly, instead of routing it to Ollama/Claude/OpenAI."
+        "If you can truly see images yourself (you are a vision-capable model), you "
+        "may set self_analyze=true on analyze_vision/capture_and_analyze instead of "
+        "using an external backend. This runs a capability check: the image comes "
+        "back with a verification code stamped on it, which you must read and echo "
+        "via vision_check before analysis proceeds. Only set self_analyze=true if you "
+        "can actually see images — if you cannot read the code, do not guess it and "
+        "do not invent a description (fabricating vision gains nothing); fall back to "
+        "self_analyze=false to route the image to the configured vision backend."
     ),
 )
 
@@ -141,19 +145,24 @@ def analyze_vision(
     ),
     backend: str | None = None,
     self_analyze: bool = False,
+    vision_check: str | None = None,
 ) -> Any:
     """Analyze an image (path + prompt) with the vision backend and return a structured report.
 
-    self_analyze=true: if you are a vision-capable model, set this to skip the
-    external backend entirely. The image is returned to you (as image content
-    plus its saved path) so you can analyze it yourself — nothing is sent to
-    Ollama/Claude/OpenAI, so no consent or API key is needed.
+    self_analyze=true: only for models that can actually see images. This does NOT
+    immediately analyze — it first returns the image with a verification code
+    stamped on it (a capability check). Read that code and call again with
+    vision_check set to it; analysis proceeds only if the code matches. If you
+    cannot read the code you are not vision-capable: do not guess it (fabricating
+    vision gains nothing) — call again with self_analyze=false to use the backend.
     """
     target = Path(image_path).expanduser()
     if self_analyze:
         from .vision_service import build_self_analysis  # noqa: PLC0415
 
-        return build_self_analysis(target, prompt)
+        return build_self_analysis(
+            target, prompt, vision_check=vision_check, backend_id=backend
+        )
     env = EnvironmentChecker().check_for_vision(backend)
     if not env.ok:
         return env.to_guide()
