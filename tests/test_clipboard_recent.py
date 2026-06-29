@@ -98,3 +98,48 @@ def test_register_image_references_original_when_disabled(tmp_path, monkeypatch)
     result = capture_service.register_image(str(src))
     assert result["status"] == "ok"
     assert Path(result["path"]) == src     # original referenced, not copied
+
+
+def test_clipboard_override_blocks_copy_despite_setting(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    from vgmcp.core import capture_service, clipboard, config as cfg
+
+    c = cfg.load_config()
+    c.target_folder = str(tmp_path / "shots")
+    c.copy_original = False
+    c.clipboard_auto = True  # user has auto-copy ON
+    cfg.save_config(c)
+
+    calls: list[int] = []
+    monkeypatch.setattr(clipboard, "copy_prompt",
+                        lambda *a, **k: (calls.append(1), (True, "t"))[1])
+    img = _write_png(tmp_path / "pic.png")
+
+    # Explicit False overrides the ON setting (the MCP tool path).
+    res = capture_service.register_image(str(img), copy_clipboard=False)
+    assert "clipboard_copied" not in res and calls == []
+
+    # Default (None) still follows the user setting (the tray path).
+    res2 = capture_service.register_image(str(img), copy_clipboard=None)
+    assert res2.get("clipboard_copied") is True and len(calls) == 1
+
+
+def test_take_screenshot_tool_never_copies(monkeypatch):
+    import asyncio
+
+    from vgmcp.server import app
+
+    seen: dict = {}
+
+    def fake_perform(*_a, **k):
+        seen.update(k)
+        return {"status": "ok", "path": "/x.png"}
+
+    monkeypatch.setattr("vgmcp.core.capture_service.perform_capture", fake_perform)
+
+    async def run():
+        tool = await app.mcp.get_tool("take_screenshot")
+        return await tool.run({"target": "monitor"})
+
+    asyncio.run(run())
+    assert seen.get("copy_clipboard") is False

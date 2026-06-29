@@ -124,6 +124,9 @@ def take_screenshot(
     """
     from ..core.capture_service import perform_capture  # noqa: PLC0415
 
+    # Clipboard auto-copy is a user-initiated convenience (tray capture / recent).
+    # An LLM tool call is not the user acting, so never copy here regardless of
+    # the clipboard_auto setting.
     return perform_capture(
         target,
         monitor_index=monitor_index,
@@ -131,6 +134,7 @@ def take_screenshot(
         app_name=app_name,
         title_contains=title_contains,
         x=x, y=y, w=w, h=h,
+        copy_clipboard=False,
     )
 
 
