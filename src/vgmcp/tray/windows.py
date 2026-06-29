@@ -52,20 +52,50 @@ _ANALYZE_PROMPT = (
 
 
 # --------------------------------------------------------------------------- #
-# Status icon (PIL — no SVG rasterizer needed on Windows)
+# Status icon — the brand aperture, drawn with PIL (no SVG rasterizer on Windows)
 # --------------------------------------------------------------------------- #
+# Geometry mirrors src/vgmcp/assets/aperture.svg (the macOS source of truth):
+# a circle + 6 iris blades in a 20-unit space, after the SVG's net translate
+# (-2, -2). We add a +1 margin (so the 2-unit stroke never clips), giving a
+# 22-unit viewBox. Keep in sync if aperture.svg ever changes.
+_APERTURE_VB = 22.0
+_APERTURE_CIRCLE = (11.0, 11.0, 9.0)  # cx, cy, r
+_APERTURE_LINES = (
+    (11.0, 2.0, 14.4384781, 11.6277387),
+    (3.20577125, 6.5, 13.2628766, 8.33606),
+    (3.20577125, 15.5, 9.8243984, 7.70832125),
+    (11.0, 20.0, 7.56152188, 10.3722612),
+    (18.7942287, 15.5, 8.73712344, 13.66394),
+    (18.7942288, 6.5, 12.1756016, 14.2916788),
+)
+_APERTURE_STROKE = 2.0  # in viewBox units
+
+
 def _status_image(color: str, size: int = 64):
-    """Draw a simple aperture-like glyph (ring + center dot) in the status color."""
+    """Render the aperture icon in the status color (4x supersampled, round caps)."""
     from PIL import Image, ImageDraw  # noqa: PLC0415
 
     rgb = _STATUS_RGB.get(color, _STATUS_RGB["gray"])
-    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    ss = 4  # supersample, then downscale for smooth (antialiased) edges
+    res = size * ss
+    u = res / _APERTURE_VB  # units -> supersampled pixels
+    width = max(1, round(_APERTURE_STROKE * u))
+    cap = width / 2.0  # round-cap radius
+
+    img = Image.new("RGBA", (res, res), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    pad = size // 8
-    draw.ellipse([pad, pad, size - pad, size - pad], outline=rgb, width=max(2, size // 12))
-    c, r = size // 2, size // 6
-    draw.ellipse([c - r, c - r, c + r, c + r], fill=rgb)
-    return img
+
+    cx, cy, r = (v * u for v in _APERTURE_CIRCLE)
+    draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=rgb, width=width)
+
+    for x1, y1, x2, y2 in _APERTURE_LINES:
+        p1 = (x1 * u, y1 * u)
+        p2 = (x2 * u, y2 * u)
+        draw.line([p1, p2], fill=rgb, width=width)
+        for px, py in (p1, p2):  # round line caps
+            draw.ellipse([px - cap, py - cap, px + cap, py + cap], fill=rgb)
+
+    return img.resize((size, size), Image.LANCZOS)
 
 
 # --------------------------------------------------------------------------- #
