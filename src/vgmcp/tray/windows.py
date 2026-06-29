@@ -66,10 +66,10 @@ def _taskbar_uses_light_theme() -> bool:
         return False  # Windows default is a dark taskbar -> white icon
 
 
-def _status_rgb(color: str):
+def _status_rgb(color: str, light: bool):
     """Stroke color for a status. OK adapts to the taskbar theme (macOS parity)."""
     if color == "green":
-        return (0, 0, 0, 255) if _taskbar_uses_light_theme() else (255, 255, 255, 255)
+        return (0, 0, 0, 255) if light else (255, 255, 255, 255)
     return _STATUS_RGB.get(color, _STATUS_RGB["gray"])
 
 _RECOMMENDED_MODEL = {"anthropic": "claude-sonnet-4-6", "openai": "gpt-4o",
@@ -101,12 +101,25 @@ _APERTURE_LINES = (
 )
 _APERTURE_STROKE = 2.0  # in viewBox units
 
+# Generated icons cached by (color, light_theme, size) — the aperture is drawn
+# once per distinct appearance (Windows' analogue of macOS icons.pregenerate).
+_ICON_CACHE: dict[tuple, object] = {}
+
 
 def _status_image(color: str, size: int = 64):
-    """Render the aperture icon in the status color (4x supersampled, round caps)."""
+    """Render the aperture icon in the status color (4x supersampled, round caps).
+
+    Cached per (color, taskbar theme, size); redrawn only when one of those
+    changes."""
+    light = _taskbar_uses_light_theme()
+    key = (color, light, size)
+    cached = _ICON_CACHE.get(key)
+    if cached is not None:
+        return cached
+
     from PIL import Image, ImageDraw  # noqa: PLC0415
 
-    rgb = _status_rgb(color)
+    rgb = _status_rgb(color, light)
     ss = 4  # supersample, then downscale for smooth (antialiased) edges
     res = size * ss
     u = res / _APERTURE_VB  # units -> supersampled pixels
@@ -126,7 +139,9 @@ def _status_image(color: str, size: int = 64):
         for px, py in (p1, p2):  # round line caps
             draw.ellipse([px - cap, py - cap, px + cap, py + cap], fill=rgb)
 
-    return img.resize((size, size), Image.LANCZOS)
+    result = img.resize((size, size), Image.LANCZOS)
+    _ICON_CACHE[key] = result
+    return result
 
 
 # --------------------------------------------------------------------------- #
@@ -443,6 +458,7 @@ class WindowsTrayApp:
         self._pystray = pystray
         self.checker = EnvironmentChecker()
         self._stop = threading.Event()
+        self._icon_sig: tuple | None = None  # (color, light) last applied to the tray
         self.icon = _make_clickable_icon(
             pystray, "vgmcp", _status_image("gray"), "VGMCP", self._build_menu())
 
@@ -563,8 +579,14 @@ class WindowsTrayApp:
     # ---- refresh --------------------------------------------------------- #
     def _refresh(self) -> None:
         try:
+            # Update the tray icon only when its appearance actually changes
+            # (status or taskbar theme), avoiding a redundant Shell_NotifyIcon
+            # call every tick. The menu is always rebuilt (dynamic contents).
             color = self._status_color()
-            self.icon.icon = _status_image(color)
+            sig = (color, _taskbar_uses_light_theme())
+            if sig != self._icon_sig:
+                self.icon.icon = _status_image(color)
+                self._icon_sig = sig
             self.icon.menu = self._build_menu()
             self.icon.update_menu()
         except Exception as exc:  # noqa: BLE001 — never let the timer kill the app
