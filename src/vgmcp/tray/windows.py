@@ -878,7 +878,37 @@ def build_app() -> WindowsTrayApp:
     return WindowsTrayApp()
 
 
+def _ensure_std_streams() -> None:
+    """pythonw.exe (the console-less launcher used by start_win.bat / autostart)
+    leaves sys.stdout and sys.stderr as None. FastMCP/uvicorn print a banner and
+    log lines, so the embedded host thread would crash on its first write and the
+    port would never open (the tray icon still appears). Point the missing streams
+    at a log file so the host starts — and so errors are recoverable.
+    """
+    import sys  # noqa: PLC0415
+
+    if sys.stdout is not None and sys.stderr is not None:
+        return
+    sink = None
+    try:
+        from ..core.config import config_dir  # noqa: PLC0415
+
+        log_dir = config_dir()
+        log_dir.mkdir(parents=True, exist_ok=True)
+        sink = open(log_dir / "host.log", "w", encoding="utf-8", buffering=1)  # noqa: SIM115
+    except OSError:
+        import os  # noqa: PLC0415
+
+        sink = open(os.devnull, "w")  # noqa: SIM115
+    if sys.stdout is None:
+        sys.stdout = sink
+    if sys.stderr is None:
+        sys.stderr = sink
+
+
 def run_tray() -> None:
+    # Under pythonw there is no console; give the host writable streams first.
+    _ensure_std_streams()
     # Make the process DPI-aware before any capture/Tk work (constructs the
     # capture backend, whose __init__ sets per-monitor DPI awareness).
     from ..capture import get_capture_backend  # noqa: PLC0415
