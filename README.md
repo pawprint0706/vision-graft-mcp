@@ -157,21 +157,20 @@ shows on screen or in history.
 **OpenRouter (recommended):**
 
 ```bash
-.venv/bin/vgmcp provider add --type openrouter --model "openai/gpt-4o" --key - --set-default
+.venv/bin/vgmcp provider add --type openrouter --model "anthropic/claude-sonnet-4.6" --key - --set-default
 .venv/bin/vgmcp provider consent openrouter
 ```
 
 **Anthropic (Claude):**
 
-```bash
-.venv/bin/vgmcp provider add --type anthropic --key - --set-default
+.venv/bin/vgmcp provider add --type anthropic --model "claude-sonnet-4-6" --key - --set-default
 .venv/bin/vgmcp provider consent anthropic
 ```
 
 **OpenAI:**
 
 ```bash
-.venv/bin/vgmcp provider add --type openai --key - --set-default
+.venv/bin/vgmcp provider add --type openai --model "gpt-5.4" --key - --set-default
 .venv/bin/vgmcp provider consent openai
 ```
 

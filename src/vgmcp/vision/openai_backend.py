@@ -16,8 +16,8 @@ from ..core.models import ProviderConfig
 from .base import BaseVisionBackend, map_httpx_error
 
 _DEFAULT_MODELS = {
-    "openai": "gpt-4o",
-    "openrouter": "openai/gpt-4o",
+    "openai": "gpt-5.4",
+    "openrouter": "anthropic/claude-sonnet-4.6",
 }
 _MAX_TOKENS = 2048
 _TIMEOUT = 60.0

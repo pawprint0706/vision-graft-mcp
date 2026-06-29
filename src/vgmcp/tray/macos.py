@@ -31,10 +31,10 @@ _MAX_WINDOWS = 30
 
 # One recommended model per cloud provider (custom/ollama intentionally omitted).
 # Value = the model id prefilled; label = how it's introduced to the user.
-_RECOMMENDED_MODEL = {"anthropic": "claude-sonnet-4-6", "openai": "gpt-4o",
-                      "openrouter": "openai/gpt-4o", "ollama": "llava:7b"}
-_RECOMMENDED_LABEL = {"anthropic": "claude-sonnet-4-6", "openai": "gpt-4o",
-                      "openrouter": "openai/gpt-4o"}
+_RECOMMENDED_MODEL = {"anthropic": "claude-sonnet-4-6", "openai": "gpt-5.4",
+                      "openrouter": "anthropic/claude-sonnet-4.6", "ollama": "llava:7b"}
+_RECOMMENDED_LABEL = {"anthropic": "claude-sonnet-4-6", "openai": "gpt-5.4",
+                      "openrouter": "anthropic/claude-sonnet-4.6"}
 
 # LLM-facing: always English (models are more reliable with English instructions).
 _ANALYZE_PROMPT = (

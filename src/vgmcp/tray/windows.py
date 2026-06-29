@@ -72,8 +72,8 @@ def _status_rgb(color: str, light: bool):
         return (0, 0, 0, 255) if light else (255, 255, 255, 255)
     return _STATUS_RGB.get(color, _STATUS_RGB["gray"])
 
-_RECOMMENDED_MODEL = {"anthropic": "claude-sonnet-4-6", "openai": "gpt-4o",
-                      "openrouter": "openai/gpt-4o", "ollama": "llava:7b"}
+_RECOMMENDED_MODEL = {"anthropic": "claude-sonnet-4-6", "openai": "gpt-5.4",
+                      "openrouter": "anthropic/claude-sonnet-4.6", "ollama": "llava:7b"}
 
 # LLM-facing: always English (models are more reliable with English instructions).
 _ANALYZE_PROMPT = (
