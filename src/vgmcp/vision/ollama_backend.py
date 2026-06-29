@@ -33,8 +33,23 @@ class OllamaBackend(BaseVisionBackend):
             "model": self.model,
             "stream": False,
             "format": "json",  # ask Ollama for JSON output (plan §7.7)
+            # Reasoning models (e.g. qwen3-vl) default to thinking ON, which sends
+            # the whole answer to message.thinking and leaves message.content empty
+            # (or just "{}"). Turn it off so the answer lands in content.
+            "think": False,
             "messages": [{"role": "user", "content": prompt, "images": [b64]}],
         }
+        data = self._chat(body)
+        message = data.get("message") or {}
+        text = message.get("content") or ""
+        if not text.strip():
+            # Safety net: a reasoning model may still have put text in `thinking`.
+            text = (message.get("thinking") or "").strip()
+        if not text.strip():
+            raise VisionError(VisionErrorCode.RESPONSE_INVALID, "Received an empty response.")
+        return text
+
+    def _chat(self, body: dict) -> dict:
         try:
             resp = httpx.post(f"{self.host}/api/chat", json=body, timeout=_TIMEOUT)
             resp.raise_for_status()
@@ -44,6 +59,14 @@ class OllamaBackend(BaseVisionBackend):
                 f"Cannot connect to the local Ollama server ({self.host}).",
             ) from exc
         except httpx.HTTPStatusError as exc:
+            # Older Ollama / non-reasoning models can reject the `think` field —
+            # retry once without it rather than failing the analysis.
+            if (
+                "think" in body
+                and exc.response.status_code == 400
+                and "think" in exc.response.text.lower()
+            ):
+                return self._chat({k: v for k, v in body.items() if k != "think"})
             if exc.response.status_code == 404:
                 raise VisionError(
                     VisionErrorCode.OLLAMA_UNAVAILABLE,
@@ -54,8 +77,4 @@ class OllamaBackend(BaseVisionBackend):
         except httpx.HTTPError as exc:
             raise map_httpx_error(exc) from exc
 
-        data = resp.json()
-        text = (data.get("message") or {}).get("content") or ""
-        if not text:
-            raise VisionError(VisionErrorCode.RESPONSE_INVALID, "Received an empty response.")
-        return text
+        return resp.json()
