@@ -248,6 +248,32 @@ def _show_result(res: dict, text: str) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Tray icon — open the menu on left-click too (macOS menu-bar parity)
+# --------------------------------------------------------------------------- #
+def _make_clickable_icon(pystray, name, image, title, menu):
+    """Build a tray Icon whose context menu opens on BOTH left- and right-click.
+
+    pystray's Win32 backend only pops the menu on right-click (left-click runs
+    the default item). For parity with the macOS menu-bar app — where a single
+    click shows the menu — we subclass the backend Icon and remap a left-button
+    release to a right-button release inside `_on_notify`. If pystray's internals
+    ever change, we fall back to the stock right-click-only Icon.
+    """
+    try:
+        from pystray._util import win32  # noqa: PLC0415
+
+        class _ClickMenuIcon(pystray.Icon):
+            def _on_notify(self, wparam, lparam):
+                if lparam == win32.WM_LBUTTONUP:
+                    lparam = win32.WM_RBUTTONUP  # show the menu on a plain click
+                return super()._on_notify(wparam, lparam)
+
+        return _ClickMenuIcon(name, icon=image, title=title, menu=menu)
+    except Exception:  # noqa: BLE001 — internal API drift: degrade gracefully
+        return pystray.Icon(name, icon=image, title=title, menu=menu)
+
+
+# --------------------------------------------------------------------------- #
 # Tray app
 # --------------------------------------------------------------------------- #
 class WindowsTrayApp:
@@ -257,12 +283,8 @@ class WindowsTrayApp:
         self._pystray = pystray
         self.checker = EnvironmentChecker()
         self._stop = threading.Event()
-        self.icon = pystray.Icon(
-            "vgmcp",
-            icon=_status_image("gray"),
-            title="VGMCP",
-            menu=self._build_menu(),
-        )
+        self.icon = _make_clickable_icon(
+            pystray, "vgmcp", _status_image("gray"), "VGMCP", self._build_menu())
 
     # ---- status ---------------------------------------------------------- #
     def _status_color(self) -> str:
