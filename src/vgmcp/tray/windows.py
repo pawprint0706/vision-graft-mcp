@@ -41,12 +41,36 @@ _MAX_WINDOWS = 30
 _REFRESH_SEC = 5
 
 # Status color -> RGBA stroke for the drawn aperture glyph.
+# "green" (all-OK) is intentionally absent: like the macOS template icon, the OK
+# state adapts to the taskbar theme (white on a dark taskbar, black on a light
+# one) — see _status_rgb(). yellow/red stay colored because they signal status.
 _STATUS_RGB = {
-    "green": (52, 199, 89, 255),
     "yellow": (245, 166, 35, 255),
     "red": (255, 59, 48, 255),
     "gray": (142, 142, 147, 255),
 }
+
+
+def _taskbar_uses_light_theme() -> bool:
+    """True if the Windows taskbar is light (so the tray icon should be dark)."""
+    import winreg  # noqa: PLC0415
+
+    try:
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+        ) as key:
+            value, _ = winreg.QueryValueEx(key, "SystemUsesLightTheme")
+            return bool(value)
+    except OSError:
+        return False  # Windows default is a dark taskbar -> white icon
+
+
+def _status_rgb(color: str):
+    """Stroke color for a status. OK adapts to the taskbar theme (macOS parity)."""
+    if color == "green":
+        return (0, 0, 0, 255) if _taskbar_uses_light_theme() else (255, 255, 255, 255)
+    return _STATUS_RGB.get(color, _STATUS_RGB["gray"])
 
 _RECOMMENDED_MODEL = {"anthropic": "claude-sonnet-4-6", "openai": "gpt-4o",
                       "openrouter": "openai/gpt-4o"}
@@ -82,7 +106,7 @@ def _status_image(color: str, size: int = 64):
     """Render the aperture icon in the status color (4x supersampled, round caps)."""
     from PIL import Image, ImageDraw  # noqa: PLC0415
 
-    rgb = _STATUS_RGB.get(color, _STATUS_RGB["gray"])
+    rgb = _status_rgb(color)
     ss = 4  # supersample, then downscale for smooth (antialiased) edges
     res = size * ss
     u = res / _APERTURE_VB  # units -> supersampled pixels
