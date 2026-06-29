@@ -27,7 +27,7 @@ from ..server import host
 
 _ICON = {"green": "🟢", "yellow": "🟡", "red": "🔴", "gray": "⚪"}
 _PROVIDER_TYPES = ["anthropic", "openai", "openrouter", "custom", "ollama"]
-_MAX_WINDOWS = 15
+_MAX_WINDOWS = 30
 
 # One recommended model per cloud provider (custom/ollama intentionally omitted).
 # Value = the model id prefilled; label = how it's introduced to the user.

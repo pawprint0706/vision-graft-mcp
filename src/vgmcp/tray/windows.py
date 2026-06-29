@@ -37,7 +37,7 @@ from ..core.models import ProviderConfig
 from ..server import host
 
 _PROVIDER_TYPES = ["anthropic", "openai", "openrouter", "custom", "ollama"]
-_MAX_WINDOWS = 15
+_MAX_WINDOWS = 30
 _REFRESH_SEC = 5
 
 # Status color -> RGBA stroke for the drawn aperture glyph.

@@ -136,20 +136,24 @@ class WindowsCaptureBackend:
         out: list[WindowInfo] = []
 
         def _collect(hwnd: int, _ctx) -> bool:
-            if not win32gui.IsWindowVisible(hwnd) or win32gui.IsIconic(hwnd):
+            if not win32gui.IsWindowVisible(hwnd):
                 return True
             # Tool windows (palettes, tooltips) are not user-facing app windows.
             ex_style = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
             if ex_style & win32con.WS_EX_TOOLWINDOW:
                 return True
-            if _is_cloaked(hwnd):  # hidden UWP/virtual-desktop windows
+            if _is_cloaked(hwnd):  # hidden UWP / other-virtual-desktop windows
                 return True
             title = win32gui.GetWindowText(hwnd)
             if not title:
                 return True
+            # Minimized windows are kept: capture_window restores them first, so
+            # they are still selectable. They report an off-screen sentinel rect,
+            # so only size-filter the genuinely zero-area non-minimized ones.
+            iconic = win32gui.IsIconic(hwnd)
             left, top, right, bottom = win32gui.GetWindowRect(hwnd)
             w, h = right - left, bottom - top
-            if w <= 1 or h <= 1:
+            if not iconic and (w <= 1 or h <= 1):
                 return True
             pid: int | None = None
             app_name = ""
@@ -164,8 +168,8 @@ class WindowsCaptureBackend:
                     app_name=app_name,
                     title=title,
                     pid=pid,
-                    bounds=WindowBounds(x=left, y=top, w=w, h=h),
-                    on_screen=True,
+                    bounds=None if iconic else WindowBounds(x=left, y=top, w=w, h=h),
+                    on_screen=not iconic,
                 )
             )
             return True
