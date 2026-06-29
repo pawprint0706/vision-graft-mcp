@@ -115,6 +115,25 @@ class AppConfig(BaseModel):
         self.recent_images = [path] + [p for p in self.recent_images if p != path]
         del self.recent_images[self.recent_limit:]
 
+    def existing_recent_images(self) -> list[str]:
+        """Recent images whose files still exist on disk (most-recent first).
+
+        Stored entries are absolute paths, so deleting/moving a file (or wiping
+        the old target folder after switching) leaves stale references; callers
+        should consume this instead of ``recent_images`` directly.
+        """
+        return [p for p in self.recent_images if Path(p).exists()]
+
+    def prune_recent(self) -> int:
+        """Drop recent entries whose files no longer exist; return how many removed.
+
+        Lets the recent list self-heal: persist after calling when any were removed.
+        """
+        kept = self.existing_recent_images()
+        removed = len(self.recent_images) - len(kept)
+        self.recent_images = kept
+        return removed
+
     def effective_default(self) -> ProviderConfig | None:
         """Resolve the default provider: last-used wins, else stored default."""
         for pid in (self.last_used_provider_id, self.default_provider_id):

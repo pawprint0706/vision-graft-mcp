@@ -315,6 +315,9 @@ def _make_app_class():
 
         def _refresh_recent_menu(self) -> None:
             config = cfg.load_config()
+            # Self-heal: drop entries whose files were deleted/moved (plan §4.1).
+            if config.prune_recent():
+                cfg.save_config(config)
             items = [rumps.MenuItem(tr("타겟 폴더 열기", "Open target folder"),
                                     callback=self.open_target_folder)]
             recents = [
@@ -389,6 +392,14 @@ def _make_app_class():
         def _make_recent_cb(self, path: str):
             def cb(_=None) -> None:
                 config = cfg.load_config()
+                if not Path(path).exists():
+                    if config.prune_recent():
+                        cfg.save_config(config)
+                    self._refresh_recent_menu()
+                    _notify(tr("파일 없음", "File missing"),
+                            tr("파일이 더 이상 없어 최근 목록에서 제거했습니다.",
+                               "File no longer exists; removed from recents."))
+                    return
                 ok, _t = clipboard.copy_prompt(path, config.clipboard_template)
                 if not ok:
                     _notify(tr("복사 실패", "Copy failed"), Path(path).name)
@@ -397,6 +408,10 @@ def _make_app_class():
         # ---- analysis ----------------------------------------------------- #
         def analyze_last(self, _sender=None) -> None:
             config = cfg.load_config()
+            # Skip stale (deleted/moved) entries so we analyze a real file.
+            if config.prune_recent():
+                cfg.save_config(config)
+                self._refresh_recent_menu()
             if not config.recent_images:
                 _notify(tr("분석 불가", "Can't analyze"),
                         tr("최근 이미지가 없습니다. 먼저 캡처하세요.",

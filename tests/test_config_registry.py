@@ -69,3 +69,28 @@ def test_ollama_is_local():
     cfg = AppConfig()
     cfg.add_provider(_p("local", "ollama"))
     assert cfg.effective_default().is_local is True
+
+
+# ---- recent-image existence handling (stale-path self-heal) ---------------- #
+def test_prune_recent_drops_missing(tmp_path):
+    real = tmp_path / "a.png"
+    real.write_bytes(b"x")
+    cfg = AppConfig()
+    cfg.add_recent(str(tmp_path / "gone.png"))
+    cfg.add_recent(str(real))
+    removed = cfg.prune_recent()
+    assert removed == 1
+    assert cfg.recent_images == [str(real)]
+
+
+def test_existing_recent_images_is_nondestructive(tmp_path):
+    real = tmp_path / "a.png"
+    real.write_bytes(b"x")
+    cfg = AppConfig()
+    cfg.add_recent(str(tmp_path / "gone.png"))
+    cfg.add_recent(str(real))
+    assert cfg.existing_recent_images() == [str(real)]
+    # The stored list is untouched until prune_recent() is called.
+    assert len(cfg.recent_images) == 2
+    assert cfg.prune_recent() == 1
+    assert cfg.prune_recent() == 0  # idempotent once clean

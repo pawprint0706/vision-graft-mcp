@@ -157,6 +157,16 @@ def analyze_vision(
     vision gains nothing) — call again with self_analyze=false to use the backend.
     """
     target = Path(image_path).expanduser()
+    if not target.exists():
+        return {
+            "status": "error",
+            "code": "image_not_found",
+            "message": (
+                f"Image not found: {target}. It may have been deleted or moved, or "
+                "the target folder changed. Re-capture with take_screenshot and use "
+                "the returned path."
+            ),
+        }
     if self_analyze:
         from .vision_service import build_self_analysis  # noqa: PLC0415
 

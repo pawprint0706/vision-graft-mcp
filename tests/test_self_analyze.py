@@ -72,6 +72,20 @@ def test_missing_prior_challenge_falls_back(tmp_path, monkeypatch):
     assert res["status"] == "ok"
 
 
+def test_analyze_vision_tool_reports_missing_file(tmp_path):
+    import asyncio
+
+    from vgmcp.server.app import mcp
+
+    async def run():
+        tool = await mcp.get_tool("analyze_vision")
+        res = await tool.run({"image_path": str(tmp_path / "gone.png")})
+        return res.structured_content
+
+    out = asyncio.run(run())
+    assert out["status"] == "error" and out["code"] == "image_not_found"
+
+
 def test_stamp_is_legible_png(tmp_path):
     from PIL import Image as PILImage
 
