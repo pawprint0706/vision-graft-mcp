@@ -73,7 +73,7 @@ def _status_rgb(color: str, light: bool):
     return _STATUS_RGB.get(color, _STATUS_RGB["gray"])
 
 _RECOMMENDED_MODEL = {"anthropic": "claude-sonnet-4-6", "openai": "gpt-4o",
-                      "openrouter": "openai/gpt-4o"}
+                      "openrouter": "openai/gpt-4o", "ollama": "llava"}
 
 # LLM-facing: always English (models are more reliable with English instructions).
 _ANALYZE_PROMPT = (
@@ -786,7 +786,14 @@ class WindowsTrayApp:
                    tr(f"'{pid}' 는 이미 등록되어 있습니다. 다른 id를 입력하세요.",
                       f"'{pid}' already exists. Enter a different id."), kind="warning")
         default_model = _RECOMMENDED_MODEL.get(ptype, "")
-        if ptype in _RECOMMENDED_MODEL:
+        if ptype == "ollama":
+            mmsg = tr(
+                "모델명 (추천: llava). 추론(thinking) 모델(예: qwen3-vl)은 응답이 비거나 "
+                "불안정할 수 있어 권장하지 않습니다. 비우면 기본값(llava) 사용.",
+                "Model name (recommended: llava). Reasoning/thinking models (e.g. "
+                "qwen3-vl) can return empty/unstable output — not recommended. "
+                "Blank = default (llava).")
+        elif ptype in _RECOMMENDED_MODEL:
             mmsg = tr(f"모델명 (추천: {_RECOMMENDED_MODEL[ptype]}). 비우면 기본값 사용.",
                       f"Model name (recommended: {_RECOMMENDED_MODEL[ptype]}). Blank = default.")
         else:
