@@ -14,7 +14,7 @@ from ..core.errors import VisionError, VisionErrorCode
 from ..core.models import ProviderConfig
 from .base import BaseVisionBackend, map_httpx_error
 
-_DEFAULT_MODEL = "llava"
+_DEFAULT_MODEL = "llava:7b"
 _TIMEOUT = 180.0  # local inference can be slow
 
 

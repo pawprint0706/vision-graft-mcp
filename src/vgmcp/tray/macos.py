@@ -32,7 +32,7 @@ _MAX_WINDOWS = 30
 # One recommended model per cloud provider (custom/ollama intentionally omitted).
 # Value = the model id prefilled; label = how it's introduced to the user.
 _RECOMMENDED_MODEL = {"anthropic": "claude-sonnet-4-6", "openai": "gpt-4o",
-                      "openrouter": "openai/gpt-4o", "ollama": "llava"}
+                      "openrouter": "openai/gpt-4o", "ollama": "llava:7b"}
 _RECOMMENDED_LABEL = {"anthropic": "claude-sonnet-4-6", "openai": "gpt-4o",
                       "openrouter": "openai/gpt-4o"}
 
@@ -563,11 +563,11 @@ def _make_app_class():
             default_model = _RECOMMENDED_MODEL.get(ptype, "")
             if ptype == "ollama":
                 mmsg = tr(
-                    "모델명 (추천: llava). 추론(thinking) 모델(예: qwen3-vl)은 응답이 비거나 "
-                    "불안정할 수 있어 권장하지 않습니다. 비우면 기본값(llava) 사용.",
-                    "Model name (recommended: llava). Reasoning/thinking models (e.g. "
+                    "모델명 (추천: llava:7b). 추론(thinking) 모델(예: qwen3-vl)은 응답이 비거나 "
+                    "불안정할 수 있어 권장하지 않습니다. 비우면 기본값(llava:7b) 사용.",
+                    "Model name (recommended: llava:7b). Reasoning/thinking models (e.g. "
                     "qwen3-vl) can return empty/unstable output — not recommended. "
-                    "Blank = default (llava).")
+                    "Blank = default (llava:7b).")
             elif ptype in _RECOMMENDED_LABEL:
                 mmsg = tr(f"모델명 (추천: {_RECOMMENDED_LABEL[ptype]}). 비우면 기본값 사용.",
                           f"Model name (recommended: {_RECOMMENDED_LABEL[ptype]}). "
