@@ -9,12 +9,12 @@ recent, providers) and the status icon refresh on a timer.
 Threading model: tkinter is NOT thread-safe, so all Tk work must run on the main
 thread. run_tray() runs the pystray icon detached (its own thread) and turns the
 main thread into a UI dispatch loop (_ui_loop). Menu callbacks fire on pystray's
-worker thread and marshal any dialog / region-overlay work to the main thread via
-_ui_call (blocking until it returns). Simple alerts use native Win32 message
-boxes, which work from any thread, so they skip the marshaling entirely.
+worker thread and marshal ALL dialog / region-overlay work to the main thread via
+_ui_call (blocking until it returns).
 
-(Earlier versions created Tk on the worker thread directly; dialogs there render
-but their buttons never respond because that thread has no Tk event loop.)
+(GUI shown from the worker thread renders but never receives input — its buttons
+don't respond. This is true for Tk *and* for native Win32 message boxes here, so
+every dialog, alerts included, is marshaled to the main thread.)
 
 UI strings are localized via core.i18n.tr (Korean if the OS prefers Korean,
 otherwise English).
@@ -167,23 +167,31 @@ def _new_root():
     return root
 
 
+@_on_ui
 def _alert(title: str, message: str, kind: str = "info") -> None:
-    """Native Win32 message box — works from any thread (no Tk event loop needed)."""
-    import ctypes  # noqa: PLC0415
+    from tkinter import messagebox  # noqa: PLC0415
 
-    # MB_ICON*: error 0x10, warning 0x30, info 0x40; topmost+setforeground to surface.
-    icon_flag = {"error": 0x10, "warning": 0x30, "info": 0x40}.get(kind, 0x40)
-    flags = 0x0 | icon_flag | 0x00040000 | 0x00010000  # MB_OK | icon | TOPMOST | SETFOREGROUND
-    ctypes.windll.user32.MessageBoxW(0, str(message), str(title), flags)
+    root = _new_root()
+    try:
+        if kind == "error":
+            messagebox.showerror(title, message, parent=root)
+        elif kind == "warning":
+            messagebox.showwarning(title, message, parent=root)
+        else:
+            messagebox.showinfo(title, message, parent=root)
+    finally:
+        root.destroy()
 
 
+@_on_ui
 def _confirm(title: str, message: str) -> bool:
-    """Native Win32 OK/Cancel box — works from any thread. True if OK."""
-    import ctypes  # noqa: PLC0415
+    from tkinter import messagebox  # noqa: PLC0415
 
-    # MB_OKCANCEL 0x1 | MB_ICONQUESTION 0x20 | TOPMOST | SETFOREGROUND
-    flags = 0x1 | 0x20 | 0x00040000 | 0x00010000
-    return ctypes.windll.user32.MessageBoxW(0, str(message), str(title), flags) == 1  # IDOK
+    root = _new_root()
+    try:
+        return bool(messagebox.askokcancel(title, message, parent=root))
+    finally:
+        root.destroy()
 
 
 @_on_ui
@@ -199,6 +207,47 @@ def _text_input(message: str, title: str = "VGMCP", default: str = "",
         return resp.strip() if resp is not None else None
     finally:
         root.destroy()
+
+
+@_on_ui
+def _multiline_input(message: str, title: str = "VGMCP", default: str = "") -> str | None:
+    """Multi-line text editor (scrollable) for longer values like the clipboard
+    template. Fixed, near-square window. Returns the text, or None if cancelled."""
+    from tkinter import scrolledtext, ttk  # noqa: PLC0415
+
+    root = _new_root()
+    root.deiconify()
+    root.title(title)
+    root.geometry("520x500")
+    root.resizable(False, False)  # fixed size
+    result: dict[str, str | None] = {"value": None}
+
+    ttk.Label(root, text=message, wraplength=480, justify="left").pack(
+        padx=16, pady=(16, 8), anchor="w")
+    txt = scrolledtext.ScrolledText(root, wrap="word", undo=True)
+    txt.insert("1.0", default)
+    txt.pack(padx=16, pady=4, fill="both", expand=True)
+
+    def on_ok() -> None:
+        result["value"] = txt.get("1.0", "end-1c")  # drop Tk's trailing newline
+        root.destroy()
+
+    def on_cancel() -> None:
+        result["value"] = None
+        root.destroy()
+
+    btns = ttk.Frame(root)
+    btns.pack(padx=16, pady=(8, 16), anchor="e")
+    ttk.Button(btns, text=tr("확인", "OK"), command=on_ok).pack(side="left", padx=4)
+    ttk.Button(btns, text=tr("취소", "Cancel"), command=on_cancel).pack(side="left", padx=4)
+    root.protocol("WM_DELETE_WINDOW", on_cancel)
+    root.bind("<Escape>", lambda _e: on_cancel())
+    root.update_idletasks()
+    root.lift()
+    root.focus_force()
+    txt.focus_set()
+    root.mainloop()
+    return result["value"]
 
 
 @_on_ui
@@ -579,13 +628,13 @@ class WindowsTrayApp:
     def _on_edit_template(self, _icon=None, _item=None) -> None:
         config = cfg.load_config()
         current = config.clipboard_template or clipboard.DEFAULT_TEMPLATE
-        new = _text_input(
+        new = _multiline_input(
             tr("클립보드 프롬프트 템플릿 ({image_path}, {filename} 사용 가능)",
                "Clipboard prompt template ({image_path}, {filename} available)"),
             tr("템플릿 편집", "Edit template"), current)
         if new is None:
             return
-        config.clipboard_template = new or None
+        config.clipboard_template = (new.strip() or None)
         cfg.save_config(config)
 
     def _on_toggle_autoclip(self, _icon=None, _item=None) -> None:
