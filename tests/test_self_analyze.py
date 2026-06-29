@@ -97,3 +97,16 @@ def test_code_image_is_small_standalone_png(tmp_path):
     # check stays cheap regardless of capture size.
     with PILImage.open(io.BytesIO(data)) as img:
         assert max(img.size) <= 640
+
+
+def test_code_image_position_jitters():
+    # Same code, rendered several times -> horizontal position varies, so the
+    # bytes should not all be identical (anti position-guessing).
+    outputs = {render_code_image("446TY")[0] for _ in range(8)}
+    assert len(outputs) > 1
+
+
+def test_long_code_falls_back_to_center(tmp_path):
+    # A code too wide to shift must still render without error (centered).
+    data, mime = render_code_image("WWWWWWWWWWWWWWWWWWWWWWWW")
+    assert mime == "image/png" and len(data) > 0

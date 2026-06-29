@@ -8,6 +8,7 @@ hurting layout-level analysis (plan §7.5.2). `downscale="off"` sends as-is.
 from __future__ import annotations
 
 import io
+import random
 from pathlib import Path
 
 # Map Pillow format -> MIME type.
@@ -84,13 +85,31 @@ def _draw_centered(draw, text, font, cx: int, cy: int, fill) -> None:
         draw.text((8, cy), text, fill=fill, font=font)
 
 
+def _jittered_center_x(draw, text, font, width: int, margin: int = 12) -> int:
+    """A random horizontal center for ``text`` that keeps it fully inside ``width``.
+
+    Shifting the code's position each time is a small anti-gaming measure: a
+    text-only model can't position-guess or cache a fixed answer.
+    """
+    try:
+        box = draw.textbbox((0, 0), text, font=font)
+        half = (box[2] - box[0]) // 2
+    except Exception:  # noqa: BLE001 — metrics are best-effort
+        return width // 2
+    low, high = half + margin, width - half - margin
+    if low >= high:  # text too wide to shift — just center it
+        return width // 2
+    return random.randint(low, high)
+
+
 def render_code_image(code: str, *, width: int = 480, height: int = 180) -> tuple[bytes, str]:
     """Return ``(png_bytes, mime)`` of a small standalone image showing ``code``.
 
     Used for the self_analyze capability check: only a caller that can actually
     see images can read the code back. Rendering a tiny dedicated image (instead
     of stamping the captured screenshot) avoids wasting tokens on a large image
-    sent purely to deliver a code, and sidesteps layout issues on odd sizes.
+    sent purely to deliver a code, and sidesteps layout issues on odd sizes. The
+    code's horizontal position is jittered per call so it can't be position-guessed.
     """
     from PIL import Image, ImageDraw  # noqa: PLC0415
 
@@ -98,8 +117,9 @@ def render_code_image(code: str, *, width: int = 480, height: int = 180) -> tupl
     draw = ImageDraw.Draw(img)
     _draw_centered(draw, "VISION CHECK CODE", _load_font(int(height * 0.16)),
                    width // 2, int(height * 0.28), (180, 180, 190))
-    _draw_centered(draw, code, _load_font(int(height * 0.42)),
-                   width // 2, int(height * 0.62), (255, 90, 90))
+    code_font = _load_font(int(height * 0.42))
+    cx = _jittered_center_x(draw, code, code_font, width)
+    _draw_centered(draw, code, code_font, cx, int(height * 0.62), (255, 90, 90))
 
     buf = io.BytesIO()
     img.save(buf, format="PNG")
