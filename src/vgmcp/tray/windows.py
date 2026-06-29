@@ -196,17 +196,48 @@ def _confirm(title: str, message: str) -> bool:
 
 @_on_ui
 def _text_input(message: str, title: str = "VGMCP", default: str = "",
-                secure: bool = False) -> str | None:
-    from tkinter import simpledialog  # noqa: PLC0415
+                secure: bool = False, width: int = 46) -> str | None:
+    """Single-line input dialog. Fixed (non-resizable) window auto-sized to its
+    contents, with a wide entry. `width` is the entry width in characters
+    (bump it for long values like API keys). Returns the text, or None if
+    cancelled."""
+    import tkinter as tk  # noqa: PLC0415
+    from tkinter import ttk  # noqa: PLC0415
 
     root = _new_root()
-    try:
-        show = "*" if secure else None
-        resp = simpledialog.askstring(title, message, initialvalue=default,
-                                      show=show, parent=root)
-        return resp.strip() if resp is not None else None
-    finally:
+    root.deiconify()
+    root.title(title)
+    root.resizable(False, False)  # fixed size — no clipped controls / dead padding
+    result: dict[str, str | None] = {"value": None}
+
+    ttk.Label(root, text=message, wraplength=max(360, width * 7), justify="left").pack(
+        padx=16, pady=(16, 8), anchor="w")
+    var = tk.StringVar(value=default)
+    entry = ttk.Entry(root, textvariable=var, width=width, show=("*" if secure else ""))
+    entry.pack(padx=16, pady=4, fill="x")
+
+    def on_ok() -> None:
+        result["value"] = var.get().strip()
         root.destroy()
+
+    def on_cancel() -> None:
+        result["value"] = None
+        root.destroy()
+
+    btns = ttk.Frame(root)
+    btns.pack(padx=16, pady=(8, 16), anchor="e")
+    ttk.Button(btns, text=tr("확인", "OK"), command=on_ok).pack(side="left", padx=4)
+    ttk.Button(btns, text=tr("취소", "Cancel"), command=on_cancel).pack(side="left", padx=4)
+    root.protocol("WM_DELETE_WINDOW", on_cancel)
+    root.bind("<Return>", lambda _e: on_ok())
+    root.bind("<Escape>", lambda _e: on_cancel())
+    entry.focus_set()
+    entry.icursor("end")
+    root.update_idletasks()
+    root.lift()
+    root.focus_force()
+    root.mainloop()
+    return result["value"]
 
 
 @_on_ui
@@ -719,7 +750,7 @@ class WindowsTrayApp:
         if ptype == "custom":
             base_url = _text_input(
                 tr("base_url (OpenAI 호환 엔드포인트)", "base_url (OpenAI-compatible endpoint)"),
-                title, "")
+                title, "", width=64)
             if not base_url:
                 _alert(tr("추가 실패", "Add failed"),
                        tr("custom에는 base_url이 필요합니다.", "custom requires a base_url."),
@@ -728,7 +759,7 @@ class WindowsTrayApp:
         key_ref = None
         if ptype != "ollama":
             key = _text_input(tr("API 키 (비우면 환경변수 사용)", "API key (blank = use env var)"),
-                              title, "", secure=True)
+                              title, "", secure=True, width=64)
             if key:
                 key_ref = f"provider:{pid}"
                 credentials.set_key(key_ref, key)
