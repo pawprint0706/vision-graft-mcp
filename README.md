@@ -17,8 +17,9 @@ It works two ways at once:
 
 - **The AI uses it** through the [MCP](https://modelcontextprotocol.io) standard
   (in Cursor, Claude Desktop, oh-my-pi, etc.).
-- **You use it** from a small **menu-bar icon** (capture a screen/window/region,
-  analyze the last image, copy a ready-to-paste prompt).
+- **You use it** from a small **menu-bar icon (macOS) / system-tray icon
+  (Windows)** (capture a screen/window/region, analyze the last image, copy a
+  ready-to-paste prompt).
 
 > Platform: **macOS 14 (Sonoma) or newer**, or **Windows 10/11**.
 
@@ -62,20 +63,23 @@ that holds the camera and the settings.
 
 ## Before you start
 
-You'll use the **Terminal** app for setup (Applications → Utilities → Terminal,
-or press `⌘ Space`, type "Terminal", hit Enter). Don't worry — you only copy and
-paste a few lines.
+For setup you'll use a terminal — **Terminal** on macOS (Applications → Utilities
+→ Terminal), **PowerShell** on Windows (Start → type "PowerShell"). You only copy
+and paste a few lines. (Most steps below also have a **double-click** option, so
+you can skip the terminal entirely.)
 
-**Check you have Python 3.11 or newer.** Paste this and press Enter:
+**Check you have Python 3.11 or newer:**
 
 ```bash
-python3 --version
+python3 --version    # macOS
+python --version     # Windows
 ```
 
 - If it prints `Python 3.11.x` or higher → you're good.
 - If it's older or "command not found" → install the latest Python from
-  [python.org/downloads](https://www.python.org/downloads/) (or, if you use
-  Homebrew: `brew install python`), then re-check.
+  [python.org/downloads](https://www.python.org/downloads/) (macOS + Homebrew:
+  `brew install python`; on **Windows** tick **"Add Python to PATH"** in the
+  installer), then re-check.
 
 You'll also need an **API key** from one vision provider (pick one):
 
@@ -84,39 +88,52 @@ You'll also need an **API key** from one vision provider (pick one):
 | **OpenRouter** | <https://openrouter.ai/keys> | One key, many models. Good default. |
 | **Anthropic (Claude)** | <https://console.anthropic.com/> | |
 | **OpenAI (GPT-4o)** | <https://platform.openai.com/api-keys> | |
-| **Ollama (local)** | *no key* — <https://ollama.com> | Runs on your Mac, free, nothing leaves your computer. |
+| **Ollama (local)** | *no key* — <https://ollama.com> | Runs on your own computer, free, nothing leaves it. |
 
 ---
 
 ## Step 1 — Install
 
-**Easiest — double-click the installer.** After cloning or downloading &
-unzipping the project, open the folder in Finder and **double-click
-`install_mac.command`**. A Terminal window runs the installer (it creates an
-isolated Python environment and installs VGMCP). When it prints **"✅ 설치 완료"**,
-you're done.
+After cloning or downloading & unzipping the project:
+
+### macOS
+
+**Easiest — double-click `install_mac.command`** in the project folder (Finder).
+A Terminal window runs the installer (it creates an isolated Python environment
+and installs VGMCP). When it prints **"✅ 설치 완료 / Install complete"**, you're
+done.
 
 > If macOS won't run it (right-click only, or "permission denied"): right-click
 > `install_mac.command` → **Open** (then confirm), or in Terminal run
 > `chmod +x install_mac.command && ./install_mac.command`.
 
-**Prefer the Terminal?**
+Terminal alternative:
 
 ```bash
 cd <the project folder>
 ./install_mac.command
+# fully manual:
+python3 -m venv .venv && .venv/bin/pip install -e ".[macos]"
 ```
 
-**Fully manual (advanced):**
+### Windows
 
-```bash
-python3 -m venv .venv
-.venv/bin/pip install -e ".[macos]"
+**Easiest — double-click `install_win.bat`** in the project folder. A PowerShell
+window runs the installer; when it prints **"✅ 설치 완료 / Install complete"**,
+you're done. (The `.bat` handles the PowerShell execution-policy prompt for you.)
+
+PowerShell alternative:
+
+```powershell
+cd <the project folder>
+.\install_win.ps1     # if blocked: powershell -ExecutionPolicy Bypass -File .\install_win.ps1
+# fully manual:
+python -m venv .venv ; .\.venv\Scripts\pip install -e ".[windows]"
 ```
 
-(The `.venv/bin/` prefix used below just means "use the copy installed into this
-folder". To skip it, run `source .venv/bin/activate` once per Terminal window and
-type `vgmcp` directly.)
+> **📌 Command paths in the rest of this guide** are written in the macOS form
+> `.venv/bin/vgmcp …`. **On Windows, use `.venv\Scripts\vgmcp.exe …`** instead
+> (and `python` rather than `python3`). Everything after the prefix is identical.
 
 ---
 
@@ -164,7 +181,7 @@ shows on screen or in history.
 # First install Ollama from https://ollama.com and pull a vision model:
 ollama pull llava
 .venv/bin/vgmcp provider add --type ollama --model "llava" --set-default
-# No consent needed — it never leaves your Mac.
+# No consent needed — it never leaves your computer.
 ```
 
 The `consent` line is a one-time **"yes, you may send my screenshots to this
@@ -181,6 +198,14 @@ You should see your provider with `"has_key": true` and `"consented": true`.
 ---
 
 ## Step 3 — Grant screen-recording permission
+
+### Windows
+
+Nothing to do — Windows needs no special screen-capture permission. Skip to
+[Step 4](#step-4--start-the-app). (You can still verify with
+`.venv\Scripts\vgmcp.exe check`.)
+
+### macOS
 
 macOS must allow VGMCP to see the screen.
 
@@ -204,13 +229,20 @@ When fully set up it says the environment is OK.
 
 ## Step 4 — Start the app
 
-**Double-click `start_mac.command`** in the project folder — it launches the app in
-the background and you can close the Terminal window. (Or run `.venv/bin/vgmcp`.)
+- **macOS:** double-click **`start_mac.command`** (or run `.venv/bin/vgmcp`). A
+  small **icon appears in the menu bar** (top-right of the screen).
+- **Windows:** double-click **`start_win.bat`** (or run
+  `.venv\Scripts\vgmcp.exe`). A small **icon appears in the system tray**
+  (bottom-right by the clock — you may need to click the **^** overflow arrow).
+  It launches hidden, so you can close the window.
 
-- A small **icon appears in your menu bar** (top-right of the screen).
-- 🟢 green = ready · 🟡 yellow = works but something optional is missing ·
+Then, on either platform:
+
+- 🟢 green / **white·black** (Windows, adapts to the taskbar) = ready ·
+  🟡 yellow = works but something optional is missing ·
   🔴 red = needs attention (click it for guidance).
 - On first launch you'll see a short welcome notice — read it and click OK.
+- A single **left-click** (or right-click) opens the menu.
 
 Leave it running. To stop it, click the icon → **종료 / Quit**.
 
@@ -240,16 +272,29 @@ adapter (replace the path below with your project location):
 }
 ```
 
+On **Windows** the command is the `.exe` under `Scripts` (use double backslashes
+in JSON), e.g.:
+
+```json
+{ "mcpServers": { "vgmcp": {
+  "command": "C:\\Users\\yourname\\Projects\\vision-graft-mcp\\.venv\\Scripts\\vgmcp-adapter.exe"
+} } }
+```
+
 Find your exact path with:
 
 ```bash
-echo "$(pwd)/.venv/bin/vgmcp-adapter"
+echo "$(pwd)/.venv/bin/vgmcp-adapter"          # macOS
+```
+```powershell
+"$(Get-Location)\.venv\Scripts\vgmcp-adapter.exe"   # Windows
 ```
 
 Where this JSON goes depends on the tool:
 
 - **Cursor:** `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` in your project.
-- **Claude Desktop:** `~/Library/Application Support/Claude/claude_desktop_config.json`.
+- **Claude Desktop (macOS):** `~/Library/Application Support/Claude/claude_desktop_config.json`.
+- **Claude Desktop (Windows):** `%APPDATA%\Claude\claude_desktop_config.json`.
 - **oh-my-pi / others:** wherever the tool lists "MCP servers".
 
 Restart the AI tool after editing. It should now show VGMCP's tools (like
@@ -269,7 +314,7 @@ Restart the AI tool after editing. It should now show VGMCP's tools (like
 It will call `take_screenshot` → `analyze_vision` and use the written report to
 fix the CSS — even though it can't see images itself.
 
-**Or do it yourself from the menu bar:**
+**Or do it yourself from the menu-bar (macOS) / system-tray (Windows) icon:**
 
 - **캡처 / Capture** → whole monitor, a specific window, or **drag-select a
   region**, or open an existing image file.
@@ -326,14 +371,19 @@ key with a hidden prompt".
 
 ## Troubleshooting
 
-**The menu-bar icon isn't there.**
-The app isn't running. Run `.venv/bin/vgmcp`. (Closing the Terminal window can
-stop it — enable autostart, or keep the window open.)
+**The menu-bar / system-tray icon isn't there.**
+The app isn't running. Run `.venv/bin/vgmcp` (macOS) or `.venv\Scripts\vgmcp.exe`
+(Windows). On Windows, check the **^** system-tray overflow. (Closing the
+launching terminal can stop it — enable autostart, or use the double-click
+launcher.)
 
 **Captures are black or fail.**
-Screen-recording permission is missing or stale. Redo
-[Step 3](#step-3--grant-screen-recording-permission), then quit & restart the app.
-Run `.venv/bin/vgmcp check` to confirm.
+- **macOS:** screen-recording permission is missing or stale. Redo
+  [Step 3](#step-3--grant-screen-recording-permission), then quit & restart the
+  app. Run `.venv/bin/vgmcp check` to confirm.
+- **Windows:** no permission is needed; a black frame usually means a
+  DirectX/exclusive-fullscreen app (out of scope). Capture the **whole monitor**
+  instead, or use a normal app window.
 
 **The AI tool says the host is unreachable.**
 Start the menu-bar app (`.venv/bin/vgmcp`) — the adapter needs it running.
@@ -358,34 +408,45 @@ Install Python from [python.org/downloads](https://www.python.org/downloads/).
 
 ## Privacy & where things are stored
 
-- **API keys** are stored in the **macOS Keychain**, never in plain files.
-- **Settings** live in `~/.config/vgmcp/config.json` (providers, target folder,
-  preferences — but *not* keys).
-- **Screenshots** are saved to `~/Pictures/vgmcp/` by default (change it in
+- **API keys** are stored in the OS credential store — **macOS Keychain** /
+  **Windows Credential Manager** — never in plain files.
+- **Settings** live in `~/.config/vgmcp/config.json` (macOS) /
+  `%USERPROFILE%\.config\vgmcp\config.json` (Windows) — providers, target folder,
+  preferences, but *not* keys.
+- **Screenshots** are saved to `~/Pictures/vgmcp/` (macOS) /
+  `%USERPROFILE%\Pictures\vgmcp\` (Windows) by default (change it in
   Settings → Target folder).
 - **Cloud providers** receive your screenshots only after you give **consent**
   per provider. Large images are scaled down before sending; small ones are sent
-  as-is. Prefer **Ollama** if you want nothing to leave your Mac.
+  as-is. Prefer **Ollama** if you want nothing to leave your computer.
 
 ---
 
 ## For developers
 
 ```bash
+# macOS
 .venv/bin/pip install -e ".[macos,dev]"
 .venv/bin/python -m pytest -q      # run tests
 .venv/bin/ruff check src/ tests/   # lint
 ```
+```powershell
+# Windows
+.\.venv\Scripts\pip install -e ".[windows,dev]"
+.\.venv\Scripts\python -m pytest -q
+.\.venv\Scripts\ruff check src/ tests/
+```
 
 - **Language:** the app, installer, and launcher show **Korean if the OS prefers
   Korean, otherwise English**. Force it with `VGMCP_LANG=ko` or `VGMCP_LANG=en`.
-- **Custom tray icon:** the menu-bar icon is generated from a single SVG at
-  `src/vgmcp/assets/aperture.svg`. Replace that file with your own line-art SVG
-  (keep `stroke="#000000"` so recoloring works) — VGMCP renders three states
-  from it: a black **template** image for normal (auto black/white by light/dark
-  mode) and **amber/red** versions for the warning/error states. Adjust the
-  render resolution with `icon_size` in `~/.config/vgmcp/config.json`. Cached
-  PNGs live in `~/.config/vgmcp/icons/` (delete them to regenerate).
+- **Custom tray icon:** the icon comes from a single SVG at
+  `src/vgmcp/assets/aperture.svg` (the source of truth). On **macOS** it's
+  rasterized to cached PNGs in `~/.config/vgmcp/icons/` (delete to regenerate);
+  the normal state is a black **template** image (auto black/white by light/dark)
+  plus **amber/red** for warning/error. On **Windows** the same geometry is drawn
+  with Pillow in-memory (coords mirror the SVG in `tray/windows.py`); the OK state
+  adapts to the taskbar theme (white/black) with amber/red for warning/error. If
+  you change `aperture.svg`, update the Windows coordinates to match.
 - Architecture, milestones, and the full spec: [`docs/plan.md`](docs/plan.md);
   original concept: [`docs/idea.md`](docs/idea.md).
 - The tray app hosts a loopback MCP server (`127.0.0.1:8765`) holding the shared
@@ -395,4 +456,5 @@ Install Python from [python.org/downloads](https://www.python.org/downloads/).
 - Override the adapter's target with `VGMCP_SERVER_URL` (or `VGMCP_HOST` /
   `VGMCP_PORT`) if you run the host somewhere non-default.
 
-Requires Python ≥ 3.11; macOS target is 14 (Sonoma)+ (ScreenCaptureKit).
+Requires Python ≥ 3.11. macOS target is 14 (Sonoma)+ (ScreenCaptureKit);
+Windows target is 10/11 (mss + Win32, pystray tray).
