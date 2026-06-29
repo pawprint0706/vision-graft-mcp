@@ -179,10 +179,19 @@ shows on screen or in history.
 
 ```bash
 # First install Ollama from https://ollama.com and pull a vision model:
-ollama pull llava
-.venv/bin/vgmcp provider add --type ollama --model "llava" --set-default
+ollama pull llava:7b
+.venv/bin/vgmcp provider add --type ollama --model "llava:7b" --set-default
 # No consent needed — it never leaves your computer.
 ```
+
+> **Choosing a local model.** Use a **non-reasoning** vision model that fits your
+> **VRAM** — reasoning/thinking VLMs (e.g. `qwen3-vl`) tend to spend the whole
+> token budget "thinking" and return an empty/unstable answer, so they're not
+> recommended here. For an **8 GB** GPU, **`llava:7b`** (~4.7 GB) is the
+> recommended pick. With less VRAM try a smaller model (e.g. `moondream`); with
+> more, a larger one. Note that small local models are handy for quick checks but
+> are far less accurate than a cloud model — use a cloud provider when you need a
+> precise analysis.
 
 The `consent` line is a one-time **"yes, you may send my screenshots to this
 cloud service"** confirmation. (Ollama doesn't need it.)
@@ -399,7 +408,7 @@ needs this.
 
 **`OLLAMA_UNAVAILABLE`.**
 Start Ollama (`ollama serve`) and make sure the model is pulled
-(`ollama pull llava`).
+(`ollama pull llava:7b`).
 
 **`command not found: python3`.**
 Install Python from [python.org/downloads](https://www.python.org/downloads/).

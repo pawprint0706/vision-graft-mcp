@@ -175,10 +175,18 @@ python -m venv .venv ; .\.venv\Scripts\pip install -e ".[windows]"
 
 ```bash
 # 먼저 https://ollama.com 에서 Ollama 설치 후 비전 모델을 받으세요:
-ollama pull llava
-.venv/bin/vgmcp provider add --type ollama --model "llava" --set-default
+ollama pull llava:7b
+.venv/bin/vgmcp provider add --type ollama --model "llava:7b" --set-default
 # 외부(컴퓨터 밖)로 나가지 않으므로 동의(consent) 불필요.
 ```
+
+> **로컬 모델 선택.** 자신의 **VRAM**에 맞는 **비추론(non-reasoning)** 비전 모델을
+> 쓰세요 — 추론(thinking) 계열 VLM(예: `qwen3-vl`)은 토큰을 전부 "생각"에 쓰고
+> 빈/불안정한 응답을 내놓는 경향이 있어 권장하지 않습니다. **8GB** GPU 기준
+> **`llava:7b`**(~4.7GB)를 추천합니다. VRAM이 더 적으면 작은 모델(예:
+> `moondream`), 더 많으면 큰 모델을 고르세요. 단 소형 로컬 모델은 빠른 점검엔
+> 좋지만 클라우드 모델보다 정확도가 크게 떨어지므로, 정밀한 분석이 필요하면
+> 클라우드 백엔드를 쓰세요.
 
 `consent` 줄은 **"내 스크린샷을 이 클라우드 서비스로 보내도 좋다"**는 1회
 동의입니다. (Ollama는 필요 없습니다.)
@@ -391,7 +399,7 @@ API 키가 틀렸거나 만료됐습니다. 다시 저장하세요:
 
 **`OLLAMA_UNAVAILABLE`이 나요.**
 Ollama를 실행(`ollama serve`)하고 모델을 받았는지 확인하세요
-(`ollama pull llava`).
+(`ollama pull llava:7b`).
 
 **`command not found: python3`.**
 [python.org/downloads](https://www.python.org/downloads/)에서 Python을
