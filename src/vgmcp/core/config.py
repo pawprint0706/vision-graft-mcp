@@ -121,21 +121,54 @@ def config_path() -> Path:
 
 @contextmanager
 def _file_lock(target: Path):
-    """Best-effort cross-process lock via a sibling .lock file (fcntl)."""
+    """Best-effort cross-process lock via a sibling .lock file.
+
+    POSIX uses fcntl.flock; Windows uses msvcrt byte-range locking. Either way a
+    failure to acquire degrades to proceeding without the lock (the write itself
+    is still atomic via temp file + os.replace), so a captured screenshot or
+    settings change is never blocked by lock contention.
+    """
     target.parent.mkdir(parents=True, exist_ok=True)
     lock_file = target.with_suffix(target.suffix + ".lock")
     try:
-        import fcntl  # noqa: PLC0415 — POSIX only; Windows uses a different path later
+        import fcntl  # noqa: PLC0415 — POSIX only
+    except ImportError:
+        fcntl = None  # type: ignore[assignment]
 
+    if fcntl is not None:
         with open(lock_file, "w") as fh:
             fcntl.flock(fh, fcntl.LOCK_EX)
             try:
                 yield
             finally:
                 fcntl.flock(fh, fcntl.LOCK_UN)
+        return
+
+    try:
+        import msvcrt  # noqa: PLC0415 — Windows
     except ImportError:
-        # No fcntl (e.g. Windows) — proceed without locking for now.
+        # Neither lock primitive available — proceed unlocked.
         yield
+        return
+
+    with open(lock_file, "w") as fh:
+        fh.write(" ")  # msvcrt.locking needs a non-empty region to lock
+        fh.seek(0)
+        locked = False
+        try:
+            msvcrt.locking(fh.fileno(), msvcrt.LK_LOCK, 1)  # blocks ~10s then raises
+            locked = True
+        except OSError:
+            pass  # contention/timeout — degrade to unlocked rather than fail the write
+        try:
+            yield
+        finally:
+            if locked:
+                fh.seek(0)
+                try:
+                    msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+                except OSError:
+                    pass
 
 
 def load_config() -> AppConfig:

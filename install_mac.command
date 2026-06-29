@@ -1,6 +1,6 @@
 #!/bin/bash
 # Vision-Graft MCP — installer.
-# Double-click this file in Finder, or run `./install.command` in Terminal.
+# Double-click this file in Finder, or run `./install_mac.command` in Terminal.
 
 set -e
 cd "$(dirname "$0")"
@@ -51,7 +51,7 @@ msg "✅ 설치 완료!" "✅ Install complete!"
 echo ""
 if [ "$KO" = 1 ]; then
   echo "── 다음 단계 ──────────────────────────────"
-  echo "1) 앱 실행:  start.command 더블클릭  (또는 ./.venv/bin/vgmcp )"
+  echo "1) 앱 실행:  start_mac.command 더블클릭  (또는 ./.venv/bin/vgmcp )"
   echo "2) 화면 기록 권한 허용:"
   echo "   시스템 설정 > 개인정보 보호 및 보안 > 화면 기록"
   echo "3) 비전 백엔드(API 키) 등록:"
@@ -61,7 +61,7 @@ if [ "$KO" = 1 ]; then
   echo "이 창은 닫아도 됩니다."
 else
   echo "── Next steps ─────────────────────────────"
-  echo "1) Start the app:  double-click start.command  (or ./.venv/bin/vgmcp )"
+  echo "1) Start the app:  double-click start_mac.command  (or ./.venv/bin/vgmcp )"
   echo "2) Grant Screen Recording permission:"
   echo "   System Settings > Privacy & Security > Screen Recording"
   echo "3) Register a vision backend (API key):"

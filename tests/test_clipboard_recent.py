@@ -11,8 +11,10 @@ from vgmcp.core.config import AppConfig
 
 
 def test_render_prompt_placeholders():
-    text = clipboard.render_prompt("/tmp/shot.png", capture_source="monitor0")
-    assert "/tmp/shot.png" in text
+    img = "/tmp/shot.png"
+    text = clipboard.render_prompt(img, capture_source="monitor0")
+    # render_prompt normalizes via Path(), so compare against the OS-native form.
+    assert str(Path(img)) in text
     assert "shot.png" in text
 
 

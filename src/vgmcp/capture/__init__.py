@@ -22,9 +22,10 @@ def get_capture_backend() -> CaptureBackend | None:
         from .macos import MacOSCaptureBackend  # noqa: PLC0415
 
         _cached = MacOSCaptureBackend()
-    elif is_windows() and module_available("win32gui"):
-        # Windows backend is a later milestone (plan §11 M6).
-        _cached = None
+    elif is_windows() and module_available("mss") and module_available("win32gui"):
+        from .windows import WindowsCaptureBackend  # noqa: PLC0415
+
+        _cached = WindowsCaptureBackend()
     else:
         _cached = None
     return _cached

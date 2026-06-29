@@ -31,12 +31,12 @@ macos = [
     "rumps>=0.4.0",
     "mss>=9.0",
 ]
-# Capture / tray (Windows) — future milestone
+# Capture / tray (Windows)
 windows = [
-    "pywin32>=306",
-    "pygetwindow>=0.0.9",
-    "pystray>=0.19",
-    "mss>=9.0",
+    "pywin32>=306",      # window enumeration / process names (win32gui, win32api)
+    "pystray>=0.19",     # system-tray icon + menu
+    "mss>=9.0",          # monitor / region / window screen capture
+    "pyperclip>=1.8",    # clipboard copy (core.clipboard fallback)
 ]
 clipboard = ["pyperclip>=1.8"]
 dev = ["pytest>=8.0", "ruff>=0.6"]

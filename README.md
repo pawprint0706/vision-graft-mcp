@@ -20,7 +20,7 @@ It works two ways at once:
 - **You use it** from a small **menu-bar icon** (capture a screen/window/region,
   analyze the last image, copy a ready-to-paste prompt).
 
-> Platform: **macOS 14 (Sonoma) or newer**. (Windows is planned.)
+> Platform: **macOS 14 (Sonoma) or newer**, or **Windows 10/11**.
 
 ---
 
@@ -92,19 +92,19 @@ You'll also need an **API key** from one vision provider (pick one):
 
 **Easiest — double-click the installer.** After cloning or downloading &
 unzipping the project, open the folder in Finder and **double-click
-`install.command`**. A Terminal window runs the installer (it creates an
+`install_mac.command`**. A Terminal window runs the installer (it creates an
 isolated Python environment and installs VGMCP). When it prints **"✅ 설치 완료"**,
 you're done.
 
 > If macOS won't run it (right-click only, or "permission denied"): right-click
-> `install.command` → **Open** (then confirm), or in Terminal run
-> `chmod +x install.command && ./install.command`.
+> `install_mac.command` → **Open** (then confirm), or in Terminal run
+> `chmod +x install_mac.command && ./install_mac.command`.
 
 **Prefer the Terminal?**
 
 ```bash
 cd <the project folder>
-./install.command
+./install_mac.command
 ```
 
 **Fully manual (advanced):**
@@ -204,7 +204,7 @@ When fully set up it says the environment is OK.
 
 ## Step 4 — Start the app
 
-**Double-click `start.command`** in the project folder — it launches the app in
+**Double-click `start_mac.command`** in the project folder — it launches the app in
 the background and you can close the Terminal window. (Or run `.venv/bin/vgmcp`.)
 
 - A small **icon appears in your menu bar** (top-right of the screen).

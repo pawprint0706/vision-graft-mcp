@@ -21,7 +21,7 @@ from .core import config as cfg
 from .core import credentials
 from .core.environment import EnvironmentChecker
 from .core.models import ProviderConfig
-from .core.platform import is_macos, module_available
+from .core.platform import is_macos, is_windows, module_available
 
 
 def _resolve_key_arg(value: str | None) -> str | None:
@@ -34,6 +34,11 @@ def _resolve_key_arg(value: str | None) -> str | None:
 def _run_app(args) -> int:
     if not args.no_tray and is_macos() and module_available("rumps"):
         from .tray.macos import run_tray  # noqa: PLC0415
+
+        run_tray()
+        return 0
+    if not args.no_tray and is_windows() and module_available("pystray"):
+        from .tray.windows import run_tray  # noqa: PLC0415
 
         run_tray()
         return 0
@@ -172,15 +177,15 @@ def _cmd_autostart(args) -> int:
     from .core import autostart  # noqa: PLC0415
 
     if args.action == "enable":
-        path = autostart.enable()
-        print(json.dumps({"status": "ok", "autostart": True, "plist": str(path)},
+        location = autostart.enable()
+        print(json.dumps({"status": "ok", "autostart": True, "location": location},
                          ensure_ascii=False))
     elif args.action == "disable":
         autostart.disable()
         print(json.dumps({"status": "ok", "autostart": False}, ensure_ascii=False))
     else:  # status
         print(json.dumps({"autostart": autostart.is_enabled(),
-                          "plist": str(autostart.plist_path())}, ensure_ascii=False))
+                          "location": autostart.location()}, ensure_ascii=False))
     return 0
 
 
@@ -253,7 +258,7 @@ def main(argv: list[str] | None = None) -> int:
     p_an.add_argument("--backend", help="provider id (defaults to the default provider)")
     p_an.set_defaults(func=_cmd_analyze)
 
-    p_as = sub.add_parser("autostart", help="start at login (LaunchAgent)")
+    p_as = sub.add_parser("autostart", help="start at login (LaunchAgent / Run key)")
     p_as.add_argument("action", choices=["enable", "disable", "status"], nargs="?",
                       default="status")
     p_as.set_defaults(func=_cmd_autostart)

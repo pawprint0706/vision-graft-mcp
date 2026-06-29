@@ -25,6 +25,18 @@ def _detect() -> str:
             return "ko" if str(langs[0]).lower().startswith("ko") else "en"
     except Exception:  # noqa: BLE001 — not macOS / Foundation unavailable
         pass
+    import sys  # noqa: PLC0415
+
+    if sys.platform.startswith("win"):
+        # POSIX locale env vars are usually unset on Windows; ask the OS for the
+        # user's UI language. LANG_KOREAN primary id == 0x12.
+        try:
+            import ctypes  # noqa: PLC0415
+
+            langid = ctypes.windll.kernel32.GetUserDefaultUILanguage()
+            return "ko" if (langid & 0x3FF) == 0x12 else "en"
+        except Exception:  # noqa: BLE001
+            pass
     for var in ("LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"):
         val = os.environ.get(var)
         if val:

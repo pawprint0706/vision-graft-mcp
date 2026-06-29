@@ -1,6 +1,6 @@
 #!/bin/bash
 # Vision-Graft MCP — launch the menu-bar app.
-# Double-click this file in Finder, or run `./start.command` in Terminal.
+# Double-click this file in Finder, or run `./start_mac.command` in Terminal.
 
 cd "$(dirname "$0")"
 
@@ -10,8 +10,8 @@ case "$LOC" in ko*) KO=1 ;; *) KO=0 ;; esac
 msg() { if [ "$KO" = 1 ]; then echo "$1"; else echo "$2"; fi; }
 
 if [ ! -x ".venv/bin/vgmcp" ]; then
-  msg "✗ 아직 설치되지 않았습니다. 먼저 install.command 를 실행하세요." \
-      "✗ Not installed yet. Run install.command first."
+  msg "✗ 아직 설치되지 않았습니다. 먼저 install_mac.command 를 실행하세요." \
+      "✗ Not installed yet. Run install_mac.command first."
   exit 1
 fi
 
