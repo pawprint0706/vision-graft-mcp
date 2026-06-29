@@ -98,6 +98,22 @@ def _save_png(grab, path: Path) -> tuple[int, int]:
     return int(grab.width), int(grab.height)
 
 
+def _is_blank(grab) -> bool:
+    """True if a grab is essentially solid black — the signature of a window that
+    refuses capture (DRM via SetWindowDisplayAffinity/WDA_EXCLUDEFROMCAPTURE,
+    DirectX exclusive-fullscreen, etc.). Samples ~2000 pixels for speed."""
+    rgb = grab.rgb
+    n = len(rgb)
+    if n < 3:
+        return True
+    stride = max(3, (n // 3 // 2000) * 3)
+    total = samples = 0
+    for i in range(0, n - 2, stride):
+        total += rgb[i] + rgb[i + 1] + rgb[i + 2]
+        samples += 1
+    return (total / (samples * 3)) < 6 if samples else True  # ~0/255 brightness
+
+
 # --------------------------------------------------------------------------- #
 # Backend
 # --------------------------------------------------------------------------- #
@@ -213,18 +229,28 @@ class WindowsCaptureBackend:
             raise CaptureError(f"Window not found: window_id={window_id}")
 
         _bring_to_front(hwnd)
+        app_name = self._app_name_for(hwnd)
         left, top, right, bottom = _window_bounds(hwnd)
         w, h = right - left, bottom - top
-        if w <= 0 or h <= 0:
-            raise CaptureError("Window has no visible area to capture.")
+        dest.mkdir(parents=True, exist_ok=True)
 
-        with mss.mss() as sct:
-            grab = sct.grab({"left": left, "top": top, "width": w, "height": h})
-            dest.mkdir(parents=True, exist_ok=True)
-            app_name = self._app_name_for(hwnd)
-            path = dest / f"{_safe_name(app_name)}_{_timestamp()}.png"
-            width, height = _save_png(grab, path)
-        return CaptureResult(path=str(path), width=width, height=height, source=app_name)
+        if w > 0 and h > 0:
+            with mss.mss() as sct:
+                grab = sct.grab({"left": left, "top": top, "width": w, "height": h})
+                if not _is_blank(grab):
+                    path = dest / f"{_safe_name(app_name)}_{_timestamp()}.png"
+                    width, height = _save_png(grab, path)
+                    return CaptureResult(path=str(path), width=width, height=height,
+                                         source=app_name)
+
+        # The window refused capture (blank frame) or has no usable rect. Fall
+        # back to the whole monitor it sits on, so the user still gets the view.
+        index = _monitor_index_for_window(hwnd)
+        res = self.capture_monitor(index, dest)
+        return CaptureResult(
+            path=res.path, width=res.width, height=res.height,
+            source=f"{app_name} (window capture unavailable — monitor{index} fallback)",
+        )
 
     def capture_region(self, x: int, y: int, w: int, h: int, dest: Path) -> CaptureResult:
         """Capture a rectangle in virtual-desktop pixels (primary top-left = origin)."""
@@ -318,6 +344,47 @@ def _window_bounds(hwnd: int) -> tuple[int, int, int, int]:
     import win32gui  # noqa: PLC0415
 
     return win32gui.GetWindowRect(hwnd)
+
+
+def _monitor_index_for_window(hwnd: int) -> int:
+    """0-based index (matching list_monitors / capture_monitor) of the monitor the
+    window sits on. Falls back to 0 (primary) if it can't be determined."""
+    import ctypes  # noqa: PLC0415
+    from ctypes import wintypes  # noqa: PLC0415
+
+    class _MONITORINFO(ctypes.Structure):
+        _fields_ = [
+            ("cbSize", wintypes.DWORD),
+            ("rcMonitor", wintypes.RECT),
+            ("rcWork", wintypes.RECT),
+            ("dwFlags", wintypes.DWORD),
+        ]
+
+    try:
+        MONITOR_DEFAULTTONEAREST = 2
+        hmon = ctypes.windll.user32.MonitorFromWindow(
+            wintypes.HWND(hwnd), MONITOR_DEFAULTTONEAREST
+        )
+        info = _MONITORINFO()
+        info.cbSize = ctypes.sizeof(_MONITORINFO)
+        if not ctypes.windll.user32.GetMonitorInfoW(hmon, ctypes.byref(info)):
+            return 0
+        left, top = info.rcMonitor.left, info.rcMonitor.top
+    except (AttributeError, OSError):
+        return 0
+
+    import mss  # noqa: PLC0415
+
+    with mss.mss() as sct:
+        monitors = sct.monitors[1:]
+        for idx, mon in enumerate(monitors):  # exact top-left match
+            if int(mon["left"]) == left and int(mon["top"]) == top:
+                return idx
+        for idx, mon in enumerate(monitors):  # else: contains the top-left point
+            if (mon["left"] <= left < mon["left"] + mon["width"]
+                    and mon["top"] <= top < mon["top"] + mon["height"]):
+                return idx
+    return 0
 
 
 def _bring_to_front(hwnd: int) -> None:
