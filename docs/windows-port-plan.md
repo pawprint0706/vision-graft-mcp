@@ -99,6 +99,8 @@
 
 **잔여 제약 (plan §7.4):** DirectX 풀스크린/배타 모드 같은 일부 GPU 앱은 위 방식으로도 검은 화면이 날 수 있으나, 이는 현재 목표 밖이다. 최악의 경우 **모니터 전체 캡처(`capture_monitor`)로 항상 우회 가능**하다.
 
+**최소화 창 (플랫폼 차이, 의도적):** Windows는 `list_windows`에 최소화 창도 포함하고 `capture_window`가 `SW_RESTORE`로 복원 후 캡처한다(권한 불필요). macOS는 최소화 창을 제외한다 — ScreenCaptureKit은 최소화 창의 렌더 surface가 없고, 타 앱 창을 복원하려면 별도의 접근성(Accessibility) 권한이 필요해 비용 대비 효율이 낮다. 이 비대칭은 의도적으로 두고 README에 명시했다.
+
 **WGC 후속 분리 사유:** 견고 대응인 `Windows.Graphics.Capture`(Win10 1903+)는 WinRT/COM interop + D3D11 프레임풀 파이프라인이 필요해 비용이 높다. 다만 `windows-capture` 같은 기성 Rust 백엔드 PyPI 패키지로 비용을 크게 낮출 여지가 있으므로, plan.md의 "Python 바인딩이 약하다"는 전제는 재검토 대상이다. **결론: 레거시 mss/GDI로 먼저 구현하고, 실제로 "캡처해야 할 대상 창에서 검은 화면이 자주 난다"는 사례가 보고되면 그때 M6.6(WGC)을 앞당겨 투자**한다 (plan §11 제외사항 기준).
 
 **팩토리 수정:** `capture/__init__.py:25-29`의 stub을

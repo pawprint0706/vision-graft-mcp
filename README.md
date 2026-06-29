@@ -273,6 +273,11 @@ fix the CSS — even though it can't see images itself.
 
 - **캡처 / Capture** → whole monitor, a specific window, or **drag-select a
   region**, or open an existing image file.
+  - *Platform note — minimized windows:* on **Windows** the app-window list
+    includes minimized windows and restores them automatically before capturing.
+    On **macOS** minimized windows are skipped (ScreenCaptureKit has no rendered
+    surface for them, and restoring another app's window would require a separate
+    Accessibility permission), so un-minimize the window first to capture it.
 - **마지막 이미지 분석 / Analyze last image** → sends the most recent capture to
   your vision model and shows a summary.
 - **최근 이미지 / Recent images** → click one to copy a ready-to-paste prompt
