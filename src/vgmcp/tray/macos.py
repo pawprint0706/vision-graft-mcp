@@ -342,6 +342,8 @@ def _make_app_class():
             for p in config.providers:
                 mark = "✓ " if p.id == default_id else "   "
                 sub = rumps.MenuItem(f"{mark}{p.id} ({p.type})")
+                sub.add(rumps.MenuItem(tr("모델명 변경", "Change model name"),
+                                       callback=self._make_changemodel_cb(p.id)))
                 sub.add(rumps.MenuItem(tr("기본값으로 설정", "Set as default"),
                                        callback=self._make_setdefault_cb(p.id)))
                 if not p.is_local:
@@ -519,8 +521,36 @@ def _make_app_class():
             else:
                 autostart.enable()
                 self.autostart_item.state = 1
+        def _make_changemodel_cb(self, pid: str):
+            def cb(_=None) -> None:
+                config = cfg.load_config()
+                provider = config.get_provider(pid)
+                if provider is None:
+                    return
+                ptype = provider.type
+                current = provider.model or ""
+                default_model = _RECOMMENDED_MODEL.get(ptype, "")
+                if ptype == "ollama":
+                    mmsg = tr(
+                        "모델명 (추천: llava:7b). 추론(thinking) 모델(예: qwen3-vl)은 응답이 비거나 "
+                        "불안정할 수 있어 권장하지 않습니다. 비우면 기본값(llava:7b) 사용.",
+                        "Model name (recommended: llava:7b). Reasoning/thinking models (e.g. "
+                        "qwen3-vl) can return empty/unstable output — not recommended. "
+                        "Blank = default (llava:7b).")
+                elif ptype in _RECOMMENDED_LABEL:
+                    mmsg = tr(f"모델명 (추천: {_RECOMMENDED_LABEL[ptype]}). 비우면 기본값 사용.",
+                              f"Model name (recommended: {_RECOMMENDED_LABEL[ptype]}). "
+                              "Blank = default.")
+                else:
+                    mmsg = tr("모델명 (비우면 기본값 사용).", "Model name (blank = default).")
+                model = _text_input(mmsg, tr("모델명 변경", "Change model name"), current)
+                if model is None:
+                    return  # cancelled
+                provider.model = model or ""
+                cfg.save_config(config)
+                self._refresh_backend_menu()
+            return cb
 
-        # ---- backend management ------------------------------------------- #
         def _make_setdefault_cb(self, pid: str):
             def cb(_=None) -> None:
                 config = cfg.load_config()

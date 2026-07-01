@@ -565,19 +565,16 @@ class WindowsTrayApp:
         items: list = []
         for prov in config.providers:
             mark = "✓ " if prov.id == default_id else "   "
-            sub_items = [Item(tr("기본값으로 설정", "Set as default"),
-                              self._make_setdefault_cb(prov.id))]
+            sub_items = [Item(tr("모델명 변경", "Change model name"),
+                              self._make_changemodel_cb(prov.id))]
+            sub_items.append(Item(tr("기본값으로 설정", "Set as default"),
+                                  self._make_setdefault_cb(prov.id)))
             if not prov.is_local:
                 label = (tr("외부 전송 동의 해제", "Revoke external-send consent")
                          if prov.consented else tr("외부 전송 동의", "Allow external send"))
                 sub_items.append(Item(label, self._make_consent_cb(prov.id, not prov.consented)))
             sub_items.append(Item(tr("삭제", "Remove"), self._make_removeprovider_cb(prov.id)))
             items.append(Item(f"{mark}{prov.id} ({prov.type})", Menu(*sub_items)))
-        if not config.providers:
-            items.append(Item(tr("(등록된 provider 없음)", "(no providers registered)"),
-                              None, enabled=False))
-        items.append(Item(tr("추가...", "Add…"), self._on_add_provider))
-        return Menu(*items)
 
     # ---- refresh --------------------------------------------------------- #
     def _refresh(self) -> None:
@@ -751,6 +748,36 @@ class WindowsTrayApp:
         self._refresh()
 
     # ---- backend management ---------------------------------------------- #
+    def _make_changemodel_cb(self, pid: str):
+        def cb(_icon=None, _item=None) -> None:
+            config = cfg.load_config()
+            provider = config.get_provider(pid)
+            if provider is None:
+                return
+            ptype = provider.type
+            current = provider.model or ""
+            default_model = _RECOMMENDED_MODEL.get(ptype, "")
+            if ptype == "ollama":
+                mmsg = tr(
+                    "모델명 (추천: llava:7b). 추론(thinking) 모델(예: qwen3-vl)은 응답이 비거나 "
+                    "불안정할 수 있어 권장하지 않습니다. 비우면 기본값(llava:7b) 사용.",
+                    "Model name (recommended: llava:7b). Reasoning/thinking models (e.g. "
+                    "qwen3-vl) can return empty/unstable output — not recommended. "
+                    "Blank = default (llava:7b).")
+            elif ptype in _RECOMMENDED_MODEL and ptype != "ollama":
+                mmsg = tr(f"모델명 (추천: {_RECOMMENDED_MODEL[ptype]}). 비우면 기본값 사용.",
+                          f"Model name (recommended: {_RECOMMENDED_MODEL[ptype]}). "
+                          "Blank = default.")
+            else:
+                mmsg = tr("모델명 (비우면 기본값 사용).", "Model name (blank = default).")
+            model = _text_input(mmsg, tr("모델명 변경", "Change model name"), current)
+            if model is None:
+                return  # cancelled
+            provider.model = model or ""
+            cfg.save_config(config)
+            self._refresh()
+        return cb
+
     def _make_setdefault_cb(self, pid: str):
         def cb(_icon=None, _item=None) -> None:
             config = cfg.load_config()
