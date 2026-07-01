@@ -575,6 +575,11 @@ class WindowsTrayApp:
                 sub_items.append(Item(label, self._make_consent_cb(prov.id, not prov.consented)))
             sub_items.append(Item(tr("삭제", "Remove"), self._make_removeprovider_cb(prov.id)))
             items.append(Item(f"{mark}{prov.id} ({prov.type})", Menu(*sub_items)))
+        if not config.providers:
+            items.append(Item(tr("(등록된 provider 없음)", "(no providers registered)"),
+                              None, enabled=False))
+        items.append(Item(tr("추가...", "Add…"), self._on_add_provider))
+        return Menu(*items)
 
     # ---- refresh --------------------------------------------------------- #
     def _refresh(self) -> None:
