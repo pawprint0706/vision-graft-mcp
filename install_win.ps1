@@ -78,12 +78,12 @@ if ($KO) {
     Write-Host "2) 비전 백엔드(API 키) 등록:"
     Write-Host "   트레이 아이콘 > 설정 > 비전 백엔드 관리 > 추가…"
     Write-Host ""
-    Write-Host "자세한 사용법은 README.ko.md 를 참고하세요."
+    Write-Host "자세한 사용법은 README.md 를 참고하세요."
 } else {
     Write-Host "── Next steps ─────────────────────────────"
     Write-Host "1) Start the app:  double-click start_win.bat  (or .\.venv\Scripts\vgmcp.exe )"
     Write-Host "2) Register a vision backend (API key):"
     Write-Host "   tray icon > Settings > Manage vision backends > Add…"
     Write-Host ""
-    Write-Host "See README.md for full instructions."
+    Write-Host "See docs/README.en.md for full instructions."
 }

@@ -64,7 +64,7 @@ if [ "$KO" = 1 ]; then
   echo "3) 비전 백엔드(API 키) 등록:"
   echo "   메뉴바 아이콘 > 설정 > 비전 백엔드 관리 > 추가…"
   echo ""
-  echo "자세한 사용법은 README.ko.md 를 참고하세요."
+  echo "자세한 사용법은 README.md 를 참고하세요."
   echo "이 창은 닫아도 됩니다."
 else
   echo "── Next steps ─────────────────────────────"
@@ -74,6 +74,6 @@ else
   echo "3) Register a vision backend (API key):"
   echo "   menu-bar icon > Settings > Manage vision backends > Add…"
   echo ""
-  echo "See README.md for full instructions."
+  echo "See docs/README.en.md for full instructions."
   echo "You can close this window."
 fi
