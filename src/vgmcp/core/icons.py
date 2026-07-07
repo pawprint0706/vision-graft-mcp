@@ -10,6 +10,15 @@ NSImage (no extra dependencies):
 
 `size` is the render resolution; the menu bar displays at ~20pt, so a larger
 size just means crisper retina output.
+
+Per Apple's HIG for menu-bar extras, the glyph must not fill the bar edge to
+edge — it needs interior padding (recommended optical size ~16pt inside the
+~22pt bar). The source aperture SVG fills its whole viewBox, so we bake a
+transparent margin into the raster (`_PADDING_FRACTION`) and thin the stroke
+toward the HIG's 1.5–2pt range. The `normal` state is rendered black + alpha as
+a Template image, so macOS recolors it (black / white / translucent gray) to
+match the light/dark bar and wallpaper automatically; the yellow/red states are
+the HIG-sanctioned exception where a status color is shown deliberately.
 """
 
 from __future__ import annotations
@@ -25,6 +34,19 @@ _COLORS = {
     "red": "#FF3B30",
     "gray": "#8E8E93",
 }
+
+# Transparent margin baked into every side of the raster, as a fraction of the
+# canvas. The source glyph spans ~0.9 of its viewBox, so ~0.13 padding brings the
+# displayed glyph from the bar-filling ~18-20pt down to a comfortable ~16pt.
+_PADDING_FRACTION = 0.13
+
+# Stroke weight for the line art (HIG suggests ~1.5-2pt). The source SVG uses 2;
+# a hair thinner reads cleaner once the icon shrinks into the bar.
+_STROKE_WIDTH = "1.6"
+
+# Cache-key version. Bump when the rendered appearance changes (padding, stroke,
+# color) so previously cached PNGs are regenerated instead of reused.
+_RENDER_VERSION = "v2"
 
 DEFAULT_SIZE = 36  # render px; displayed at the menu bar's ~20pt (retina-crisp)
 
@@ -72,7 +94,11 @@ def _rasterize(svg_text: str, size: int, dest: Path) -> bool:
     img = NSImage.alloc().initWithData_(data)
     if img is None:
         return False
-    img.setSize_(NSMakeSize(size, size))
+    # Draw the glyph into an inset rect so the raster keeps a transparent margin
+    # (HIG interior padding); the rest of the canvas stays clear.
+    pad = round(size * _PADDING_FRACTION)
+    inner = size - 2 * pad
+    img.setSize_(NSMakeSize(inner, inner))
 
     rep = NSBitmapImageRep.alloc().initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel_(  # noqa: E501
         None, size, size, 8, 4, True, False, "NSCalibratedRGBColorSpace", 0, 0
@@ -83,7 +109,7 @@ def _rasterize(svg_text: str, size: int, dest: Path) -> bool:
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.setCurrentContext_(ctx)
     img.drawInRect_fromRect_operation_fraction_(
-        NSMakeRect(0, 0, size, size), NSZeroRect, NSCompositingOperationSourceOver, 1.0
+        NSMakeRect(pad, pad, inner, inner), NSZeroRect, NSCompositingOperationSourceOver, 1.0
     )
     NSGraphicsContext.restoreGraphicsState()
 
@@ -97,10 +123,14 @@ def get_icon(state: str, size: int = DEFAULT_SIZE) -> Path | None:
     """Return a PNG path for the given state, generating/caching as needed."""
     if state not in _COLORS:
         state = "normal"
-    dest = _icons_dir() / f"aperture_{state}_{size}.png"
+    dest = _icons_dir() / f"aperture_{state}_{size}_{_RENDER_VERSION}.png"
     if dest.exists():
         return dest
-    svg = _base_svg().replace('stroke="#000000"', f'stroke="{_COLORS[state]}"')
+    svg = (
+        _base_svg()
+        .replace('stroke="#000000"', f'stroke="{_COLORS[state]}"')
+        .replace('stroke-width="2"', f'stroke-width="{_STROKE_WIDTH}"')
+    )
     return dest if _rasterize(svg, size, dest) else None
 
 

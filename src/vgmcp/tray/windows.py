@@ -87,19 +87,27 @@ _ANALYZE_PROMPT = (
 # --------------------------------------------------------------------------- #
 # Geometry mirrors src/vgmcp/assets/aperture.svg (the macOS source of truth):
 # a circle + 6 iris blades in a 20-unit space, after the SVG's net translate
-# (-2, -2). We add a +1 margin (so the 2-unit stroke never clips), giving a
-# 22-unit viewBox. Keep in sync if aperture.svg ever changes.
-_APERTURE_VB = 22.0
-_APERTURE_CIRCLE = (11.0, 11.0, 9.0)  # cx, cy, r
+# (-2, -2). Keep in sync if aperture.svg ever changes.
+#
+# NOTE: unlike macOS (where rumps renders the glyph at a fixed 20pt and it needs
+# ~13% baked-in padding to not fill the bar), the Windows tray scales this image
+# into its own slot — extra interior padding just makes the glyph read too small.
+# So we run the OPPOSITE way here: a tight 20-unit viewBox (the glyph's native
+# extent) so it fills as much of the tray slot as possible. The glyph is centered
+# on (10, 10) and its 1.8 stroke's outer edge lands at ~0.1..19.9 — only ~0.1
+# units of margin per side, so this is effectively the maximum size before the
+# stroke would clip against the canvas edge.
+_APERTURE_VB = 20.0
+_APERTURE_CIRCLE = (10.0, 10.0, 9.0)  # cx, cy, r
 _APERTURE_LINES = (
-    (11.0, 2.0, 14.4384781, 11.6277387),
-    (3.20577125, 6.5, 13.2628766, 8.33606),
-    (3.20577125, 15.5, 9.8243984, 7.70832125),
-    (11.0, 20.0, 7.56152188, 10.3722612),
-    (18.7942287, 15.5, 8.73712344, 13.66394),
-    (18.7942288, 6.5, 12.1756016, 14.2916788),
+    (10.0, 1.0, 13.4384781, 10.6277387),
+    (2.20577125, 5.5, 12.2628766, 7.33606),
+    (2.20577125, 14.5, 8.8243984, 6.70832125),
+    (10.0, 19.0, 6.56152188, 9.3722612),
+    (17.7942287, 14.5, 7.73712344, 12.66394),
+    (17.7942288, 5.5, 11.1756016, 13.2916788),
 )
-_APERTURE_STROKE = 2.0  # in viewBox units
+_APERTURE_STROKE = 1.8  # in viewBox units
 
 # Generated icons cached by (color, light_theme, size) — the aperture is drawn
 # once per distinct appearance (Windows' analogue of macOS icons.pregenerate).
