@@ -24,3 +24,5 @@ env/
 *.webp
 !docs/**/*.png
 config.local.json
+
+.claude/settings.local.json
