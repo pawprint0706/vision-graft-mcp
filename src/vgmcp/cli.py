@@ -82,12 +82,20 @@ def _cmd_provider_add(args) -> int:
         base_url=args.base_url,
         key_ref=key_ref,
     )
-    config.add_provider(provider)
-    if args.set_default:
-        config.set_default_provider(pid)  # also pins last_used so it takes effect
-    cfg.save_config(config)
+    def add_provider(latest) -> None:
+        latest.add_provider(provider)
+        if args.set_default:
+            latest.set_default_provider(pid)
+
+    try:
+        config = cfg.update_config(add_provider)
+    except ValueError:
+        if key_ref:
+            credentials.delete_key(key_ref)
+        print(f"provider id already exists: {pid}", file=sys.stderr)
+        return 1
     print(json.dumps({"status": "ok", "added": pid, "default": config.default_provider_id},
-                     ensure_ascii=False))
+                      ensure_ascii=False))
     return 0
 
 
@@ -97,22 +105,35 @@ def _cmd_provider_update(args) -> int:
     if provider is None:
         print(f"provider not found: {args.id}", file=sys.stderr)
         return 1
-    if args.type is not None:
-        provider.type = args.type
-    if args.model is not None:
-        provider.model = args.model
-    if args.label is not None:
-        provider.label = args.label
-    if args.base_url is not None:
-        provider.base_url = args.base_url
     key_value = _resolve_key_arg(args.key)
     if key_value is not None:
         # Reuse the existing key_ref if present, else create one.
         provider.key_ref = provider.key_ref or f"provider:{provider.id}"
         credentials.set_key(provider.key_ref, key_value)
-    if args.set_default:
-        config.set_default_provider(provider.id)  # also pins last_used so it takes effect
-    cfg.save_config(config)
+    key_ref = provider.key_ref
+
+    def update_provider(latest) -> None:
+        current = latest.get_provider(args.id)
+        if current is None:
+            return
+        if args.type is not None:
+            current.type = args.type
+        if args.model is not None:
+            current.model = args.model
+        if args.label is not None:
+            current.label = args.label
+        if args.base_url is not None:
+            current.base_url = args.base_url
+        if key_value is not None:
+            current.key_ref = key_ref
+        if args.set_default:
+            latest.set_default_provider(current.id)
+
+    config = cfg.update_config(update_provider)
+    provider = config.get_provider(args.id)
+    if provider is None:
+        print(f"provider not found: {args.id}", file=sys.stderr)
+        return 1
     print(json.dumps({"status": "ok", "updated": provider.id, "type": provider.type,
                       "model": provider.model, "base_url": provider.base_url},
                      ensure_ascii=False))
@@ -127,8 +148,7 @@ def _cmd_provider_remove(args) -> int:
         return 1
     if provider.key_ref:
         credentials.delete_key(provider.key_ref)
-    config.remove_provider(args.id)
-    cfg.save_config(config)
+    config = cfg.update_config(lambda latest: latest.remove_provider(args.id))
     print(json.dumps({"status": "ok", "removed": args.id,
                       "default": config.default_provider_id}, ensure_ascii=False))
     return 0
@@ -136,10 +156,10 @@ def _cmd_provider_remove(args) -> int:
 
 def _cmd_provider_consent(args) -> int:
     config = cfg.load_config()
-    if not config.set_consent(args.id, not args.revoke):
+    if config.get_provider(args.id) is None:
         print(f"provider not found: {args.id}", file=sys.stderr)
         return 1
-    cfg.save_config(config)
+    cfg.update_config(lambda latest: latest.set_consent(args.id, not args.revoke))
     print(json.dumps({"status": "ok", "id": args.id,
                       "consented": not args.revoke}, ensure_ascii=False))
     return 0
@@ -190,18 +210,27 @@ def _cmd_autostart(args) -> int:
 
 
 def _cmd_capture_analyze(args) -> int:
-    from .server.app import capture_and_analyze  # noqa: PLC0415
+    from .server.app import analyze_vision, take_screenshot  # noqa: PLC0415
+    from .server.vision_service import self_analysis_required  # noqa: PLC0415
 
-    result = capture_and_analyze(
+    shot = take_screenshot(
         target=args.target,
         monitor_index=args.monitor,
         window_id=args.window_id,
         app_name=args.app_name,
         title_contains=args.title_contains,
         x=args.x, y=args.y, w=args.w, h=args.h,
-        prompt=args.prompt,
-        backend=args.backend,
     )
+    if shot.get("status") != "ok":
+        print(json.dumps(shot, ensure_ascii=False, indent=2))
+        return 1
+    image_path = Path(shot["path"])
+    analyze_kwargs = {"backend": args.backend}
+    if args.prompt is not None:
+        analyze_kwargs["prompt"] = args.prompt
+    result = analyze_vision(str(image_path), **analyze_kwargs)
+    if isinstance(result, list):
+        result = self_analysis_required(image_path)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0 if result.get("status") == "ok" else 1
 

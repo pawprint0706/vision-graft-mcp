@@ -4,10 +4,19 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+from vgmcp.core import config as cfg
+from vgmcp.core.errors import SelfAnalysisRequired
 from vgmcp.core.imaging import preprocess
 from vgmcp.core.models import ProviderConfig
 from vgmcp.vision import report as report_mod
 from vgmcp.vision.base import BaseVisionBackend
+
+
+@pytest.fixture(autouse=True)
+def _isolated_config(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
 
 
 # ---- report parsing ------------------------------------------------------- #
@@ -96,3 +105,18 @@ def test_falls_back_to_degraded(tmp_path):
     assert be.calls == 2
     assert report.parse_degraded is True
     assert report.raw_text == "prose two"
+
+
+def test_corrective_retry_is_blocked_when_mode_turns_on(tmp_path):
+    src = _make_png(tmp_path, (10, 10))
+
+    class _EnableModeBackend(_FakeBackend):
+        def _complete(self, image_bytes, mime, prompt):
+            self.calls += 1
+            cfg.update_config(lambda current: setattr(current, "self_analysis_mode", True))
+            return "unparseable"
+
+    be = _EnableModeBackend([])
+    with pytest.raises(SelfAnalysisRequired):
+        be.analyze(src, "prompt")
+    assert be.calls == 1

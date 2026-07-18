@@ -12,7 +12,7 @@ import httpx
 
 from ..core.errors import VisionError, VisionErrorCode
 from ..core.models import ProviderConfig
-from .base import BaseVisionBackend, map_httpx_error
+from .base import BaseVisionBackend, ensure_backend_allowed, map_httpx_error
 
 _API_URL = "https://api.anthropic.com/v1/messages"
 _API_VERSION = "2023-06-01"
@@ -56,6 +56,7 @@ class AnthropicBackend(BaseVisionBackend):
             "content-type": "application/json",
         }
         try:
+            ensure_backend_allowed()
             resp = httpx.post(_API_URL, json=body, headers=headers, timeout=_TIMEOUT)
             resp.raise_for_status()
         except httpx.HTTPError as exc:

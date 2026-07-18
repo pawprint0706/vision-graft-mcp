@@ -293,6 +293,13 @@ verification code is returned first; read it and call again with
 matches (a vision-capability check). If you cannot read the code, fall back to
 `self_analyze=false`.
 
+**Use self-analysis mode** — enable this setting in the tray to make the user's
+choice override every tool argument. Calls and retries started after activation
+never use a vision backend; requests already in progress may finish. VGMCP
+returns the image directly to the calling LLM without a capability check. A model
+without vision support cannot analyze it. A missing vision backend is not an
+environment error in this mode, and **Analyze last image** is disabled in the tray.
+
 ## Tray menu (direct use)
 
 - **Capture** — a whole monitor · a specific app window · drag-select a region
@@ -301,8 +308,9 @@ matches (a vision-capability check). If you cannot read the code, fall back to
   and shows the result.
 - **Recent images** — click one to copy a ready-to-paste prompt (with the
   image path) to the clipboard (template editable in Settings).
-- **Settings** — manage vision backends (add · change model name · consent ·
-  default · remove), target folder, clipboard auto-copy, start at login.
+- **Settings** — self-analysis mode, manage vision backends (add · change model
+  name · consent · default · remove), target folder, clipboard auto-copy,
+  start at login.
 
 > **Window capture, platform difference** — Windows lists minimized windows
 > and restores them automatically before capturing; windows that refuse

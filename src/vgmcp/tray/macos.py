@@ -163,6 +163,9 @@ def _make_app_class():
             self.cap_menu = rumps.MenuItem(tr("캡처", "Capture"))
             self.recent_menu = rumps.MenuItem(tr("최근 이미지", "Recent images"))
             self.backend_menu = rumps.MenuItem(tr("비전 백엔드 관리", "Manage vision backends"))
+            self.self_analysis_item = rumps.MenuItem(
+                tr("셀프 분석 모드 사용", "Use self-analysis mode"),
+                callback=self.toggle_self_analysis)
             self.autoclip_item = rumps.MenuItem(tr("자동 클립보드 복사", "Auto-copy to clipboard"),
                                                 callback=self.toggle_autoclip)
             self.copyorig_item = rumps.MenuItem(
@@ -174,6 +177,7 @@ def _make_app_class():
             settings.update([
                 rumps.MenuItem(tr("타겟 폴더 설정...", "Set target folder…"),
                                callback=self.set_target_folder),
+                self.self_analysis_item,
                 self.backend_menu,
                 rumps.MenuItem(tr("클립보드 템플릿 편집...", "Edit clipboard template…"),
                                callback=self.edit_template),
@@ -181,6 +185,9 @@ def _make_app_class():
                 self.copyorig_item,
                 self.autostart_item,
             ])
+            self.analyze_item = rumps.MenuItem(
+                tr("마지막 이미지 분석 (테스트)", "Analyze last image (test)"),
+                callback=self.analyze_last)
             self.menu = [
                 self.status_item,
                 None,
@@ -188,8 +195,7 @@ def _make_app_class():
                 rumps.MenuItem(tr("이미지 파일 열기", "Open image file"), callback=self.open_image),
                 self.recent_menu,
                 None,
-                rumps.MenuItem(tr("마지막 이미지 분석 (테스트)", "Analyze last image (test)"),
-                               callback=self.analyze_last),
+                self.analyze_item,
                 settings,
                 None,
             ]
@@ -218,8 +224,9 @@ def _make_app_class():
                     "3) To keep everything local, register the Ollama backend.",
                 ),
             )
-            config.onboarding_consent_shown = True
-            cfg.save_config(config)
+            cfg.update_config(
+                lambda latest: setattr(latest, "onboarding_consent_shown", True)
+            )
 
         def stop_timer(self) -> None:
             self.timer.stop()
@@ -232,6 +239,9 @@ def _make_app_class():
                 self._refresh_recent_menu()
                 self._refresh_backend_menu()
                 config = cfg.load_config()
+                self.self_analysis_item.state = 1 if config.self_analysis_mode else 0
+                self.analyze_item.set_callback(
+                    None if config.self_analysis_mode else self.analyze_last)
                 self.autoclip_item.state = 1 if config.clipboard_auto else 0
                 self.copyorig_item.state = 1 if config.copy_original else 0
                 from ..core import autostart  # noqa: PLC0415
@@ -317,7 +327,7 @@ def _make_app_class():
             config = cfg.load_config()
             # Self-heal: drop entries whose files were deleted/moved (plan §4.1).
             if config.prune_recent():
-                cfg.save_config(config)
+                config = cfg.update_config(lambda latest: latest.prune_recent())
             items = [rumps.MenuItem(tr("타겟 폴더 열기", "Open target folder"),
                                     callback=self.open_target_folder)]
             recents = [
@@ -396,7 +406,7 @@ def _make_app_class():
                 config = cfg.load_config()
                 if not Path(path).exists():
                     if config.prune_recent():
-                        cfg.save_config(config)
+                        cfg.update_config(lambda latest: latest.prune_recent())
                     self._refresh_recent_menu()
                     _notify(tr("파일 없음", "File missing"),
                             tr("파일이 더 이상 없어 최근 목록에서 제거했습니다.",
@@ -410,9 +420,11 @@ def _make_app_class():
         # ---- analysis ----------------------------------------------------- #
         def analyze_last(self, _sender=None) -> None:
             config = cfg.load_config()
+            if config.self_analysis_mode:
+                return
             # Skip stale (deleted/moved) entries so we analyze a real file.
             if config.prune_recent():
-                cfg.save_config(config)
+                config = cfg.update_config(lambda latest: latest.prune_recent())
                 self._refresh_recent_menu()
             if not config.recent_images:
                 _notify(tr("분석 불가", "Can't analyze"),
@@ -429,8 +441,7 @@ def _make_app_class():
             if not provider.is_local and not provider.consented:
                 if not self._confirm_consent(provider):
                     return
-                config.set_consent(provider.id, True)
-                cfg.save_config(config)
+                cfg.update_config(lambda latest: latest.set_consent(provider.id, True))
                 self._refresh_backend_menu()
             image = config.recent_images[0]
 
@@ -484,9 +495,7 @@ def _make_app_class():
             path = _pick_path(directory=True)
             if not path:
                 return
-            config = cfg.load_config()
-            config.target_folder = path
-            cfg.save_config(config)
+            cfg.update_config(lambda config: setattr(config, "target_folder", path))
 
         def edit_template(self, _sender=None) -> None:
             config = cfg.load_config()
@@ -497,19 +506,45 @@ def _make_app_class():
                 tr("템플릿 편집", "Edit template"), current)
             if new is None:
                 return
-            config.clipboard_template = new or None
-            cfg.save_config(config)
+            cfg.update_config(
+                lambda latest: setattr(latest, "clipboard_template", new or None)
+            )
+
+        def toggle_self_analysis(self, _sender=None) -> None:
+            config = cfg.load_config()
+            if not config.self_analysis_mode:
+                resp = _alert(
+                    tr("셀프 분석 모드 사용", "Use self-analysis mode"),
+                    tr(
+                        "셀프 분석 모드는 비전 백엔드 요청 없이 이미지만 캡쳐하여 LLM 모델에게 "
+                        "직접 분석을 요청하는 기능입니다. 비전 기능이 없는 LLM 모델의 경우 "
+                        "이미지 분석이 불가능해집니다. 이미 시작된 분석 요청은 완료될 수 있습니다.",
+                        "Self-analysis mode captures only the image without requesting a vision "
+                        "backend and asks the LLM model to analyze it directly. LLM models without "
+                        "vision capabilities will not be able to analyze images. Analysis requests "
+                        "that have already started may finish.",
+                    ),
+                    ok=tr("확인", "Enable"),
+                    cancel=tr("취소", "Cancel"),
+                )
+                if resp != 1:
+                    return
+            enabled = not config.self_analysis_mode
+            cfg.update_config(
+                lambda latest: setattr(latest, "self_analysis_mode", enabled)
+            )
+            self.refresh()
 
         def toggle_autoclip(self, _sender=None) -> None:
-            config = cfg.load_config()
-            config.clipboard_auto = not config.clipboard_auto
-            cfg.save_config(config)
+            config = cfg.update_config(
+                lambda latest: setattr(latest, "clipboard_auto", not latest.clipboard_auto)
+            )
             self.autoclip_item.state = 1 if config.clipboard_auto else 0
 
         def toggle_copyorig(self, _sender=None) -> None:
-            config = cfg.load_config()
-            config.copy_original = not config.copy_original
-            cfg.save_config(config)
+            config = cfg.update_config(
+                lambda latest: setattr(latest, "copy_original", not latest.copy_original)
+            )
             self.copyorig_item.state = 1 if config.copy_original else 0
 
         def toggle_autostart(self, _sender=None) -> None:
@@ -529,7 +564,6 @@ def _make_app_class():
                     return
                 ptype = provider.type
                 current = provider.model or ""
-                default_model = _RECOMMENDED_MODEL.get(ptype, "")
                 if ptype == "ollama":
                     mmsg = tr(
                         "모델명 (추천: llava:7b). 추론(thinking) 모델(예: qwen3-vl)은 응답이 비거나 "
@@ -546,24 +580,24 @@ def _make_app_class():
                 model = _text_input(mmsg, tr("모델명 변경", "Change model name"), current)
                 if model is None:
                     return  # cancelled
-                provider.model = model or ""
-                cfg.save_config(config)
+                def update_model(latest) -> None:
+                    current_provider = latest.get_provider(pid)
+                    if current_provider is not None:
+                        current_provider.model = model or ""
+
+                cfg.update_config(update_model)
                 self._refresh_backend_menu()
             return cb
 
         def _make_setdefault_cb(self, pid: str):
             def cb(_=None) -> None:
-                config = cfg.load_config()
-                config.set_default_provider(pid)  # also pins last_used so it takes effect
-                cfg.save_config(config)
+                cfg.update_config(lambda latest: latest.set_default_provider(pid))
                 self._refresh_backend_menu()
             return cb
 
         def _make_consent_cb(self, pid: str, grant: bool):
             def cb(_=None) -> None:
-                config = cfg.load_config()
-                config.set_consent(pid, grant)
-                cfg.save_config(config)
+                cfg.update_config(lambda latest: latest.set_consent(pid, grant))
                 self._refresh_backend_menu()
             return cb
 
@@ -573,8 +607,7 @@ def _make_app_class():
                 p = config.get_provider(pid)
                 if p and p.key_ref:
                     credentials.delete_key(p.key_ref)
-                config.remove_provider(pid)
-                cfg.save_config(config)
+                cfg.update_config(lambda latest: latest.remove_provider(pid))
                 self._refresh_backend_menu()
             return cb
 
@@ -636,9 +669,17 @@ def _make_app_class():
                 if key:
                     key_ref = f"provider:{pid}"
                     credentials.set_key(key_ref, key)
-            config.add_provider(ProviderConfig(
-                id=pid, type=ptype, label=pid, model=model, base_url=base_url, key_ref=key_ref))
-            cfg.save_config(config)
+            provider = ProviderConfig(
+                id=pid, type=ptype, label=pid, model=model, base_url=base_url, key_ref=key_ref)
+            try:
+                cfg.update_config(lambda latest: latest.add_provider(provider))
+            except ValueError:
+                if key_ref:
+                    credentials.delete_key(key_ref)
+                _notify(tr("추가 실패", "Add failed"),
+                        tr("동일한 id가 방금 등록되었습니다.",
+                           "The same id was just registered."))
+                return
             self._refresh_backend_menu()
 
     return VGMCPApp

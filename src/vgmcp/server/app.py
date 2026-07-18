@@ -14,6 +14,7 @@ from fastmcp import FastMCP
 
 from ..core import config as cfg
 from ..core.environment import EnvironmentChecker
+from ..core.i18n import tr
 
 mcp: FastMCP = FastMCP(
     name="vgmcp",
@@ -39,6 +40,10 @@ mcp: FastMCP = FastMCP(
         "can actually see images — if you cannot read the code, do not guess it and "
         "do not invent a description (fabricating vision gains nothing); fall back to "
         "self_analyze=false to route the image to the configured vision backend."
+        " If the user enables Self-analysis mode in the tray, that server-side "
+        "setting overrides all tool arguments: no vision backend is available, the "
+        "image is returned directly without a capability check, and you must either "
+        "analyze it yourself or tell the user that this model cannot analyze images."
     ),
 )
 
@@ -59,6 +64,12 @@ def check_environment() -> dict[str, Any]:
     """Check the runtime/packages/permissions/credentials/settings and return a guide for any gaps."""
     status = EnvironmentChecker().check_full()
     if status.ok:
+        if cfg.load_config().self_analysis_mode:
+            return {
+                "status": "ok",
+                "self_analysis_mode": True,
+                "message": tr("셀프 분석 모드 사용 중", "Self-analysis mode enabled"),
+            }
         return {"status": "ok", "message": "Environment is fully configured."}
     return status.to_guide()
 
@@ -152,7 +163,7 @@ def analyze_vision(
     self_analyze: bool = False,
     vision_check: str | None = None,
 ) -> Any:
-    """Analyze an image (path + prompt) with the vision backend and return a structured report.
+    """Analyze an image with a backend, or return it directly in forced self-analysis mode.
 
     self_analyze=true: only for models that can actually see images. This does NOT
     immediately analyze — it first returns a small image showing a verification
@@ -172,6 +183,10 @@ def analyze_vision(
                 "the returned path."
             ),
         }
+    if cfg.load_config().self_analysis_mode:
+        from .vision_service import build_forced_self_analysis  # noqa: PLC0415
+
+        return build_forced_self_analysis(target, prompt)
     if self_analyze:
         from .vision_service import build_self_analysis  # noqa: PLC0415
 
@@ -205,6 +220,7 @@ def capture_and_analyze(
 
     self_analyze=true: if you are a vision-capable model, capture then get the
     image back to analyze yourself instead of routing it to an external backend.
+    The user's forced self-analysis setting overrides this argument and any backend.
     """
     shot = take_screenshot(
         target=target, monitor_index=monitor_index, window_id=window_id,
@@ -225,11 +241,12 @@ def capture_and_analyze(
 # --------------------------------------------------------------------------- #
 @mcp.tool
 def get_config() -> dict[str, Any]:
-    """Return the current settings (target folder, providers, default provider). Never includes API keys."""
+    """Return current settings (including self-analysis mode). Never includes API keys."""
     config = cfg.load_config()
     return {
         "status": "ok",
         "target_folder": config.target_folder,
+        "self_analysis_mode": config.self_analysis_mode,
         "default_provider_id": config.default_provider_id,
         "last_used_provider_id": config.last_used_provider_id,
         "providers": [
@@ -247,9 +264,7 @@ def set_target_folder(path: str) -> dict[str, Any]:
         folder.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
         return {"status": "error", "message": f"Cannot create folder: {exc}"}
-    config = cfg.load_config()
-    config.target_folder = str(folder)
-    cfg.save_config(config)
+    cfg.update_config(lambda config: setattr(config, "target_folder", str(folder)))
     return {"status": "ok", "target_folder": str(folder)}
 
 

@@ -12,7 +12,8 @@ from typing import Any
 
 from ..core import config as cfg
 from ..core import credentials
-from ..core.errors import VisionError
+from ..core.errors import SelfAnalysisRequired, VisionError
+from ..core.i18n import tr
 from ..core.models import VisionResult
 from ..vision import build_backend
 
@@ -25,6 +26,24 @@ _VISION_CHECKS: dict[str, str] = {}
 
 # Unambiguous code alphabet (no 0/O/1/I) so vision models transcribe reliably.
 _CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+def forced_self_analysis_instruction() -> str:
+    return tr(
+        "사용자의 요청으로 비전 백엔드를 사용할 수 없습니다. 직접 이미지를 분석할 수 "
+        "있다면 첨부 이미지를 분석하세요. 비전 기능이 없다면 이미지를 분석할 수 없다고 "
+        "사용자에게 알리고 직접 확인을 요청하세요.",
+        "The user has disabled vision backends. If you can see images, analyze the attached "
+        "image yourself. If you do not have vision capability, tell the user that you cannot "
+        "analyze it and ask them to inspect it directly.",
+    )
+
+
+def self_analysis_required(image_path: Path) -> dict[str, Any]:
+    return {
+        "status": "self_analysis_required",
+        "image_path": str(image_path),
+        "message": forced_self_analysis_instruction(),
+    }
 
 
 def _gen_code(length: int = 5) -> str:
@@ -51,6 +70,8 @@ def build_self_analysis(
     """
     if not image_path.exists():
         return {"status": "error", "message": f"Image not found: {image_path}"}
+    if cfg.load_config().self_analysis_mode:
+        return build_forced_self_analysis(image_path, prompt)
 
     from fastmcp.utilities.types import Image  # noqa: PLC0415
 
@@ -100,8 +121,41 @@ def build_self_analysis(
     return run_analysis(image_path, prompt, backend_id)
 
 
+def build_forced_self_analysis(image_path: Path, prompt: str) -> Any:
+    """Return the image directly to the caller without touching any backend."""
+    if not image_path.exists():
+        return {"status": "error", "message": f"Image not found: {image_path}"}
+
+    from fastmcp.utilities.types import Image  # noqa: PLC0415
+    from ..core.imaging import preprocess  # noqa: PLC0415
+
+    config = cfg.load_config()
+    try:
+        data, mime, _w, _h = preprocess(
+            image_path,
+            max_long_edge=config.max_long_edge,
+            downscale=config.downscale,
+        )
+    except Exception as exc:  # noqa: BLE001 — invalid images must not trigger backend fallback
+        return {
+            "status": "error",
+            "code": "image_unreadable",
+            "message": f"Cannot prepare image for self-analysis: {exc}",
+        }
+
+    instruction = (
+        f"{forced_self_analysis_instruction()}\n\n"
+        f"{tr('이미지 경로', 'Image path')}: {image_path}\n\n"
+        f"{tr('분석 요청', 'Analysis request')}: {prompt}"
+    )
+    return [Image(data=data, format=mime.split("/", 1)[-1]), instruction]
+
+
 def run_analysis(image_path: Path, prompt: str, backend_id: str | None) -> dict[str, Any]:
     config = cfg.load_config()
+
+    if config.self_analysis_mode:
+        return self_analysis_required(image_path)
 
     provider = (
         config.get_provider(backend_id) if backend_id else config.effective_default()
@@ -148,6 +202,8 @@ def run_analysis(image_path: Path, prompt: str, backend_id: str | None) -> dict[
 
     try:
         report = backend.analyze(image_path, prompt)
+    except SelfAnalysisRequired:
+        return self_analysis_required(image_path)
     except VisionError as exc:
         return exc.to_result(provider.id)
     except Exception as exc:  # noqa: BLE001 — surface unexpected failures as structured error
@@ -156,7 +212,10 @@ def run_analysis(image_path: Path, prompt: str, backend_id: str | None) -> dict[
         return _VE(VisionErrorCode.UNKNOWN, f"Unexpected error: {exc}").to_result(provider.id)
 
     # Success: last-used becomes the effective default going forward (plan §7.3).
-    config.mark_used(provider.id)
-    cfg.save_config(config)
+    def mark_used(latest) -> None:
+        if latest.get_provider(provider.id) is not None:
+            latest.mark_used(provider.id)
+
+    cfg.update_config(mark_used)
 
     return VisionResult(backend=provider.id, report=report).model_dump()

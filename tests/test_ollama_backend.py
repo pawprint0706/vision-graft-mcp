@@ -10,6 +10,11 @@ from vgmcp.core.models import ProviderConfig
 from vgmcp.vision import ollama_backend
 
 
+@pytest.fixture(autouse=True)
+def _isolated_config(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+
+
 class _Resp:
     def __init__(self, payload, status=200, text=""):
         self._payload = payload
@@ -110,3 +115,20 @@ def test_model_not_found_maps_to_ollama_unavailable(monkeypatch):
     with pytest.raises(VisionError) as ei:
         _backend()._complete(b"img", "image/png", "p")
     assert ei.value.code == VisionErrorCode.OLLAMA_UNAVAILABLE
+
+
+def test_retry_is_blocked_when_mode_turns_on(monkeypatch):
+    from vgmcp.core import config as cfg
+    from vgmcp.core.errors import SelfAnalysisRequired
+
+    calls = []
+
+    def fake_post(url, json=None, timeout=None):
+        calls.append(json)
+        cfg.update_config(lambda current: setattr(current, "self_analysis_mode", True))
+        return _Resp({}, status=400, text="bad request")
+
+    monkeypatch.setattr(ollama_backend.httpx, "post", fake_post)
+    with pytest.raises(SelfAnalysisRequired):
+        _backend()._complete(b"img", "image/png", "p")
+    assert len(calls) == 1

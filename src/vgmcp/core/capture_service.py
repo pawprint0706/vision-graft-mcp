@@ -120,7 +120,6 @@ def register_image(path: str, *, copy_clipboard: bool | None = None) -> dict[str
 
 def _post_capture(result, config, copy_clipboard: bool | None) -> dict[str, Any]:
     """Record recent + optional clipboard copy, then persist (plan §4.1, §8.2)."""
-    config.add_recent(result.path)
     out = result.model_dump()
     do_copy = config.clipboard_auto if copy_clipboard is None else copy_clipboard
     if do_copy:
@@ -128,5 +127,5 @@ def _post_capture(result, config, copy_clipboard: bool | None) -> dict[str, Any]
             result.path, config.clipboard_template, capture_source=result.source
         )
         out["clipboard_copied"] = ok
-    cfg.save_config(config)
+    cfg.update_config(lambda latest: latest.add_recent(result.path))
     return out

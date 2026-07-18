@@ -48,3 +48,16 @@ def test_detailed_report_shape(tmp_path, monkeypatch):
     for _label, ok, detail in report:
         assert isinstance(ok, bool)
         assert detail  # non-empty ("정상" or a reason)
+
+
+def test_self_analysis_mode_skips_missing_provider(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    monkeypatch.setenv("VGMCP_LANG", "ko")
+    config = cfg.load_config()
+    config.self_analysis_mode = True
+    cfg.save_config(config)
+
+    checker = EnvironmentChecker()
+    assert checker.check_full().ok is True
+    assert checker.check_for_vision("missing-provider").ok is True
+    assert ("비전 분석 방식", True, "셀프 분석 모드 사용 중") in checker.detailed()

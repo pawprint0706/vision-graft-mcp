@@ -124,6 +124,22 @@ def test_clipboard_override_blocks_copy_despite_setting(tmp_path, monkeypatch):
     assert res2.get("clipboard_copied") is True and len(calls) == 1
 
 
+def test_capture_completion_does_not_disable_self_analysis(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    from vgmcp.core import capture_service, config as cfg
+    from vgmcp.core.models import CaptureResult
+
+    stale = cfg.load_config()
+    cfg.update_config(lambda current: setattr(current, "self_analysis_mode", True))
+
+    result = CaptureResult(path=str(tmp_path / "shot.png"), width=10, height=10)
+    capture_service._post_capture(result, stale, copy_clipboard=False)
+
+    current = cfg.load_config()
+    assert current.self_analysis_mode is True
+    assert current.recent_images == [result.path]
+
+
 def test_take_screenshot_tool_never_copies(monkeypatch):
     import asyncio
 

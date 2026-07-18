@@ -4,10 +4,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from fastmcp.utilities.types import Image
 
 from vgmcp.core.imaging import render_code_image
 from vgmcp.server import vision_service as vs
+
+
+@pytest.fixture(autouse=True)
+def _isolated_config(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    monkeypatch.setenv("VGMCP_LANG", "ko")
 
 
 def _make_png(tmp_path: Path, size: tuple[int, int] = (200, 120)) -> Path:
@@ -70,6 +77,115 @@ def test_missing_prior_challenge_falls_back(tmp_path, monkeypatch):
     # vision_check supplied with no stored challenge -> cannot be trusted.
     res = vs.build_self_analysis(src, "p", vision_check="ABCDE")
     assert res["status"] == "ok"
+
+
+def test_forced_mode_returns_image_without_capability_check(tmp_path):
+    src = _make_png(tmp_path)
+    res = vs.build_forced_self_analysis(src, "inspect layout")
+
+    assert isinstance(res, list) and isinstance(res[0], Image)
+    assert vs.forced_self_analysis_instruction() in res[1]
+    assert f"이미지 경로: {src}" in res[1]
+    assert "분석 요청: inspect layout" in res[1]
+    assert "CAPABILITY CHECK" not in res[1]
+
+
+def test_forced_instruction_uses_selected_language(tmp_path, monkeypatch):
+    src = _make_png(tmp_path)
+    monkeypatch.setenv("VGMCP_LANG", "en")
+
+    res = vs.build_forced_self_analysis(src, "inspect layout")
+
+    assert "The user has disabled vision backends" in res[1]
+    assert f"Image path: {src}" in res[1]
+    assert "Analysis request: inspect layout" in res[1]
+
+
+def test_shared_self_analysis_builder_honors_forced_mode(tmp_path):
+    from vgmcp.core import config as cfg
+
+    src = _make_png(tmp_path)
+    cfg.update_config(lambda config: setattr(config, "self_analysis_mode", True))
+
+    res = vs.build_self_analysis(src, "inspect layout")
+
+    assert isinstance(res, list) and isinstance(res[0], Image)
+    assert "CAPABILITY CHECK" not in res[1]
+
+
+def test_forced_mode_never_calls_backend(tmp_path, monkeypatch):
+    import asyncio
+
+    from vgmcp.core import config as cfg
+    from vgmcp.server.app import mcp
+
+    src = _make_png(tmp_path)
+    config = cfg.load_config()
+    config.self_analysis_mode = True
+    cfg.save_config(config)
+    monkeypatch.setattr(vs, "run_analysis", lambda *a, **k: pytest.fail("backend called"))
+
+    async def run():
+        tool = await mcp.get_tool("analyze_vision")
+        return await tool.run({
+            "image_path": str(src),
+            "backend": "must-be-ignored",
+            "self_analyze": False,
+            "vision_check": "also-ignored",
+        })
+
+    result = asyncio.run(run())
+    assert any(getattr(item, "type", None) == "image" for item in result.content)
+    assert any(vs.forced_self_analysis_instruction() in item.text
+               for item in result.content if hasattr(item, "text"))
+
+
+def test_run_analysis_is_fail_closed_in_forced_mode(tmp_path, monkeypatch):
+    from vgmcp.core import config as cfg
+
+    src = _make_png(tmp_path)
+    config = cfg.load_config()
+    config.self_analysis_mode = True
+    cfg.save_config(config)
+    monkeypatch.setattr(vs, "build_backend", lambda *a: pytest.fail("backend initialized"))
+
+    res = vs.run_analysis(src, "p", "ignored")
+    assert res["status"] == "self_analysis_required"
+    assert res["image_path"] == str(src)
+
+
+def test_analysis_completion_does_not_disable_mode(tmp_path, monkeypatch):
+    from vgmcp.core import config as cfg
+    from vgmcp.core.models import ProviderConfig, VisionReportBody
+
+    src = _make_png(tmp_path)
+    config = cfg.load_config()
+    config.add_provider(ProviderConfig(id="local", type="ollama"))
+    cfg.save_config(config)
+
+    class Backend:
+        def analyze(self, _path, _prompt):
+            cfg.update_config(
+                lambda latest: setattr(latest, "self_analysis_mode", True)
+            )
+            return VisionReportBody(summary="ok")
+
+    monkeypatch.setattr(vs, "build_backend", lambda *_args: Backend())
+    res = vs.run_analysis(src, "p", "local")
+
+    assert res["status"] == "ok"
+    current = cfg.load_config()
+    assert current.self_analysis_mode is True
+    assert current.last_used_provider_id == "local"
+
+
+def test_forced_mode_invalid_image_does_not_fall_back(tmp_path, monkeypatch):
+    src = tmp_path / "broken.png"
+    src.write_text("not an image", encoding="utf-8")
+    monkeypatch.setattr(vs, "run_analysis", lambda *a: pytest.fail("backend called"))
+    res = vs.build_forced_self_analysis(src, "p")
+    assert res["status"] == "error"
+    assert res["code"] == "image_unreadable"
 
 
 def test_analyze_vision_tool_reports_missing_file(tmp_path):

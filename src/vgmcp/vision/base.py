@@ -11,7 +11,7 @@ import httpx
 from pathlib import Path
 
 from ..core.config import load_config
-from ..core.errors import VisionError, VisionErrorCode
+from ..core.errors import SelfAnalysisRequired, VisionError, VisionErrorCode
 from ..core.imaging import preprocess
 from ..core.interfaces import VisionBackend
 from ..core.models import ProviderConfig, VisionReportBody
@@ -32,6 +32,7 @@ class BaseVisionBackend(VisionBackend):
 
     # ---- shared pipeline --------------------------------------------------- #
     def analyze(self, image_path: Path, prompt: str) -> VisionReportBody:
+        ensure_backend_allowed()
         if not image_path.exists():
             raise VisionError(
                 VisionErrorCode.BAD_REQUEST, f"Image file does not exist: {image_path}"
@@ -42,6 +43,7 @@ class BaseVisionBackend(VisionBackend):
         )
 
         full_prompt = prompt + report_mod.SCHEMA_INSTRUCTION
+        ensure_backend_allowed()
         raw = self._complete(image_bytes, mime, full_prompt)
 
         parsed = report_mod.try_parse(raw)
@@ -51,6 +53,7 @@ class BaseVisionBackend(VisionBackend):
         # One corrective retry (plan §7.7 step 3).
         corrective = report_mod.CORRECTIVE_INSTRUCTION + raw + report_mod.SCHEMA_INSTRUCTION
         try:
+            ensure_backend_allowed()
             raw2 = self._complete(image_bytes, mime, corrective)
         except VisionError:
             return report_mod.degraded(raw)
@@ -60,6 +63,12 @@ class BaseVisionBackend(VisionBackend):
 
         # Lossless fallback (plan §7.7 step 4).
         return report_mod.degraded(raw2 or raw)
+
+
+def ensure_backend_allowed() -> None:
+    """Fail closed immediately before a backend transport attempt."""
+    if load_config().self_analysis_mode:
+        raise SelfAnalysisRequired
 
 
 def map_httpx_error(exc: Exception) -> VisionError:

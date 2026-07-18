@@ -12,7 +12,7 @@ import httpx
 
 from ..core.errors import VisionError, VisionErrorCode
 from ..core.models import ProviderConfig
-from .base import BaseVisionBackend, map_httpx_error
+from .base import BaseVisionBackend, ensure_backend_allowed, map_httpx_error
 
 _DEFAULT_MODEL = "llava:7b"
 _TIMEOUT = 180.0  # local inference can be slow
@@ -51,6 +51,7 @@ class OllamaBackend(BaseVisionBackend):
 
     def _chat(self, body: dict) -> dict:
         try:
+            ensure_backend_allowed()
             resp = httpx.post(f"{self.host}/api/chat", json=body, timeout=_TIMEOUT)
             resp.raise_for_status()
         except httpx.ConnectError as exc:

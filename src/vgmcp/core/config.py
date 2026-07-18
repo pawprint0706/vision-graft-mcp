@@ -12,8 +12,10 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import threading
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Callable
 
 from pydantic import BaseModel, Field
 
@@ -25,6 +27,7 @@ DEFAULT_BASE_URLS: dict[str, str] = {
     "openrouter": "https://openrouter.ai/api/v1",
 }
 DEFAULT_OLLAMA_HOST = "http://localhost:11434"
+_PROCESS_LOCK = threading.RLock()
 
 
 def config_dir() -> Path:
@@ -61,6 +64,9 @@ class AppConfig(BaseModel):
     # Image preprocessing (plan §7.5)
     max_long_edge: int = 1568
     downscale: str = "auto"  # "auto" | "off"
+
+    # Force captured images back to the calling LLM; never use a vision backend.
+    self_analysis_mode: bool = False
 
     # Privacy consent already shown during onboarding (plan §7.9)
     onboarding_consent_shown: bool = False
@@ -152,13 +158,12 @@ def config_path() -> Path:
 
 
 @contextmanager
-def _file_lock(target: Path):
+def _file_lock(target: Path, *, required: bool = False):
     """Best-effort cross-process lock via a sibling .lock file.
 
-    POSIX uses fcntl.flock; Windows uses msvcrt byte-range locking. Either way a
-    failure to acquire degrades to proceeding without the lock (the write itself
-    is still atomic via temp file + os.replace), so a captured screenshot or
-    settings change is never blocked by lock contention.
+    POSIX uses fcntl.flock; Windows uses msvcrt byte-range locking. Legacy
+    full-snapshot saves can degrade to an unlocked atomic replace; transactional
+    updates require lock acquisition so concurrent fields are never overwritten.
     """
     target.parent.mkdir(parents=True, exist_ok=True)
     lock_file = target.with_suffix(target.suffix + ".lock")
@@ -168,7 +173,7 @@ def _file_lock(target: Path):
         fcntl = None  # type: ignore[assignment]
 
     if fcntl is not None:
-        with open(lock_file, "w") as fh:
+        with open(lock_file, "a+b") as fh:
             fcntl.flock(fh, fcntl.LOCK_EX)
             try:
                 yield
@@ -180,18 +185,25 @@ def _file_lock(target: Path):
         import msvcrt  # noqa: PLC0415 — Windows
     except ImportError:
         # Neither lock primitive available — proceed unlocked.
+        if required:
+            raise RuntimeError("No config file-lock implementation is available")
         yield
         return
 
-    with open(lock_file, "w") as fh:
-        fh.write(" ")  # msvcrt.locking needs a non-empty region to lock
+    with open(lock_file, "a+b") as fh:
+        if fh.tell() == 0:
+            fh.write(b" ")  # msvcrt.locking needs a non-empty region to lock
+            fh.flush()
         fh.seek(0)
         locked = False
         try:
             msvcrt.locking(fh.fileno(), msvcrt.LK_LOCK, 1)  # blocks ~10s then raises
             locked = True
         except OSError:
-            pass  # contention/timeout — degrade to unlocked rather than fail the write
+            if required:
+                raise
+            # Legacy full-snapshot saves remain best-effort. Transactional updates
+            # below never proceed without the cross-process lock.
         try:
             yield
         finally:
@@ -203,8 +215,7 @@ def _file_lock(target: Path):
                     pass
 
 
-def load_config() -> AppConfig:
-    path = config_path()
+def _load_config(path: Path) -> AppConfig:
     if not path.exists():
         return AppConfig()
     try:
@@ -214,16 +225,39 @@ def load_config() -> AppConfig:
     return AppConfig.model_validate(data)
 
 
+def load_config() -> AppConfig:
+    return _load_config(config_path())
+
+
+def _write_config(path: Path, config: AppConfig) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = config.model_dump_json(indent=2, exclude_none=True)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(payload)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+
 def save_config(config: AppConfig) -> None:
+    """Replace the full config snapshot.
+
+    Runtime read-modify-write operations should use ``update_config`` so they do
+    not overwrite fields changed concurrently by the tray, MCP host, or CLI.
+    """
     path = config_path()
-    with _file_lock(path):
-        path.parent.mkdir(parents=True, exist_ok=True)
-        payload = config.model_dump_json(indent=2, exclude_none=True)
-        fd, tmp = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                fh.write(payload)
-            os.replace(tmp, path)
-        finally:
-            if os.path.exists(tmp):
-                os.unlink(tmp)
+    with _PROCESS_LOCK, _file_lock(path):
+        _write_config(path, config)
+
+
+def update_config(mutator: Callable[[AppConfig], None]) -> AppConfig:
+    """Apply a focused mutation to the latest config under one mandatory lock."""
+    path = config_path()
+    with _PROCESS_LOCK, _file_lock(path, required=True):
+        config = _load_config(path)
+        mutator(config)
+        _write_config(path, config)
+    return config

@@ -56,6 +56,11 @@ def test_recheck_removed_from_settings(app):
     assert "환경 재검사" not in list(app.menu["설정"].keys())
 
 
+def test_self_analysis_precedes_backend_setting(app):
+    keys = list(app.menu["설정"].keys())
+    assert keys.index("셀프 분석 모드 사용") < keys.index("비전 백엔드 관리")
+
+
 def test_capture_submenu(app):
     caps = list(app.menu["캡처"].keys())
     assert any("모니터" in k for k in caps)

@@ -13,7 +13,7 @@ import httpx
 
 from ..core.errors import VisionError, VisionErrorCode
 from ..core.models import ProviderConfig
-from .base import BaseVisionBackend, map_httpx_error
+from .base import BaseVisionBackend, ensure_backend_allowed, map_httpx_error
 
 _DEFAULT_MODELS = {
     "openai": "gpt-5.4",
@@ -65,6 +65,7 @@ class OpenAICompatibleBackend(BaseVisionBackend):
             "Content-Type": "application/json",
         }
         try:
+            ensure_backend_allowed()
             resp = httpx.post(
                 f"{self.base_url}/chat/completions",
                 json=body,

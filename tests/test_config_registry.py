@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from vgmcp.core import config as config_module
 from vgmcp.core.config import AppConfig
 from vgmcp.core.models import ProviderConfig
 
@@ -69,6 +70,31 @@ def test_ollama_is_local():
     cfg = AppConfig()
     cfg.add_provider(_p("local", "ollama"))
     assert cfg.effective_default().is_local is True
+
+
+def test_self_analysis_mode_defaults_off():
+    assert AppConfig().self_analysis_mode is False
+
+
+def test_self_analysis_mode_round_trip(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    config = AppConfig(self_analysis_mode=True)
+    config_module.save_config(config)
+    assert config_module.load_config().self_analysis_mode is True
+
+
+def test_transactional_update_preserves_self_analysis_mode(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    config_module.save_config(AppConfig())
+
+    config_module.update_config(
+        lambda config: setattr(config, "self_analysis_mode", True)
+    )
+    config_module.update_config(lambda config: setattr(config, "clipboard_auto", False))
+
+    current = config_module.load_config()
+    assert current.self_analysis_mode is True
+    assert current.clipboard_auto is False
 
 
 # ---- recent-image existence handling (stale-path self-heal) ---------------- #

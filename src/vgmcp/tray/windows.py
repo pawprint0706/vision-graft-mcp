@@ -499,7 +499,8 @@ class WindowsTrayApp:
             Item(tr("최근 이미지", "Recent images"), self._recent_menu()),
             Menu.SEPARATOR,
             Item(tr("마지막 이미지 분석 (테스트)", "Analyze last image (test)"),
-                 self._on_analyze_last),
+                 self._on_analyze_last,
+                 enabled=lambda _i: not cfg.load_config().self_analysis_mode),
             Item(tr("설정", "Settings"), self._settings_menu()),
             Menu.SEPARATOR,
             Item(tr("종료", "Quit"), self._on_quit),
@@ -540,7 +541,7 @@ class WindowsTrayApp:
         config = cfg.load_config()
         # Self-heal: drop entries whose files were deleted/moved (plan §4.1).
         if config.prune_recent():
-            cfg.save_config(config)
+            config = cfg.update_config(lambda latest: latest.prune_recent())
         items = [Item(tr("타겟 폴더 열기", "Open target folder"), self._on_open_target_folder)]
         recents = [Item(Path(pth).name, self._make_recent_cb(pth))
                    for pth in config.recent_images]
@@ -555,6 +556,9 @@ class WindowsTrayApp:
 
         return Menu(
             Item(tr("타겟 폴더 설정...", "Set target folder…"), self._on_set_target_folder),
+            Item(tr("셀프 분석 모드 사용", "Use self-analysis mode"),
+                 self._on_toggle_self_analysis,
+                 checked=lambda _i: cfg.load_config().self_analysis_mode),
             Item(tr("비전 백엔드 관리", "Manage vision backends"), self._backend_menu()),
             Item(tr("클립보드 템플릿 편집...", "Edit clipboard template…"), self._on_edit_template),
             Item(tr("자동 클립보드 복사", "Auto-copy to clipboard"),
@@ -651,7 +655,7 @@ class WindowsTrayApp:
             config = cfg.load_config()
             if not Path(path).exists():
                 if config.prune_recent():
-                    cfg.save_config(config)
+                    cfg.update_config(lambda latest: latest.prune_recent())
                 self._refresh()
                 _alert(tr("파일 없음", "File missing"),
                        tr("파일이 더 이상 없어 최근 목록에서 제거했습니다.",
@@ -672,9 +676,11 @@ class WindowsTrayApp:
     # ---- analysis -------------------------------------------------------- #
     def _on_analyze_last(self, _icon=None, _item=None) -> None:
         config = cfg.load_config()
+        if config.self_analysis_mode:
+            return
         # Skip stale (deleted/moved) entries so we analyze a real file.
         if config.prune_recent():
-            cfg.save_config(config)
+            config = cfg.update_config(lambda latest: latest.prune_recent())
             self._refresh()
         if not config.recent_images:
             _alert(tr("분석 불가", "Can't analyze"),
@@ -690,8 +696,7 @@ class WindowsTrayApp:
         if not provider.is_local and not provider.consented:
             if not self._confirm_consent(provider):
                 return
-            config.set_consent(provider.id, True)
-            cfg.save_config(config)
+            cfg.update_config(lambda latest: latest.set_consent(provider.id, True))
             self._refresh()
         image = config.recent_images[0]
 
@@ -723,9 +728,7 @@ class WindowsTrayApp:
         path = _pick_dir()
         if not path:
             return
-        config = cfg.load_config()
-        config.target_folder = path
-        cfg.save_config(config)
+        cfg.update_config(lambda config: setattr(config, "target_folder", path))
 
     def _on_edit_template(self, _icon=None, _item=None) -> None:
         config = cfg.load_config()
@@ -736,19 +739,38 @@ class WindowsTrayApp:
             tr("템플릿 편집", "Edit template"), current)
         if new is None:
             return
-        config.clipboard_template = (new.strip() or None)
-        cfg.save_config(config)
+        value = new.strip() or None
+        cfg.update_config(lambda latest: setattr(latest, "clipboard_template", value))
+
+    def _on_toggle_self_analysis(self, _icon=None, _item=None) -> None:
+        config = cfg.load_config()
+        if not config.self_analysis_mode and not _confirm(
+            tr("셀프 분석 모드 사용", "Use self-analysis mode"),
+            tr(
+                "셀프 분석 모드는 비전 백엔드 요청 없이 이미지만 캡쳐하여 LLM 모델에게 "
+                "직접 분석을 요청하는 기능입니다. 비전 기능이 없는 LLM 모델의 경우 이미지 "
+                "분석이 불가능해집니다. 이미 시작된 분석 요청은 완료될 수 있습니다.",
+                "Self-analysis mode captures only the image without requesting a vision "
+                "backend and asks the LLM model to analyze it directly. LLM models without "
+                "vision capabilities will not be able to analyze images. Analysis requests "
+                "that have already started may finish.",
+            ),
+        ):
+            return
+        enabled = not config.self_analysis_mode
+        cfg.update_config(lambda latest: setattr(latest, "self_analysis_mode", enabled))
+        self._refresh()
 
     def _on_toggle_autoclip(self, _icon=None, _item=None) -> None:
-        config = cfg.load_config()
-        config.clipboard_auto = not config.clipboard_auto
-        cfg.save_config(config)
+        cfg.update_config(
+            lambda config: setattr(config, "clipboard_auto", not config.clipboard_auto)
+        )
         self._refresh()
 
     def _on_toggle_copyorig(self, _icon=None, _item=None) -> None:
-        config = cfg.load_config()
-        config.copy_original = not config.copy_original
-        cfg.save_config(config)
+        cfg.update_config(
+            lambda config: setattr(config, "copy_original", not config.copy_original)
+        )
         self._refresh()
 
     def _on_toggle_autostart(self, _icon=None, _item=None) -> None:
@@ -769,7 +791,6 @@ class WindowsTrayApp:
                 return
             ptype = provider.type
             current = provider.model or ""
-            default_model = _RECOMMENDED_MODEL.get(ptype, "")
             if ptype == "ollama":
                 mmsg = tr(
                     "모델명 (추천: llava:7b). 추론(thinking) 모델(예: qwen3-vl)은 응답이 비거나 "
@@ -786,24 +807,24 @@ class WindowsTrayApp:
             model = _text_input(mmsg, tr("모델명 변경", "Change model name"), current)
             if model is None:
                 return  # cancelled
-            provider.model = model or ""
-            cfg.save_config(config)
+            def update_model(latest) -> None:
+                current_provider = latest.get_provider(pid)
+                if current_provider is not None:
+                    current_provider.model = model or ""
+
+            cfg.update_config(update_model)
             self._refresh()
         return cb
 
     def _make_setdefault_cb(self, pid: str):
         def cb(_icon=None, _item=None) -> None:
-            config = cfg.load_config()
-            config.set_default_provider(pid)  # also pins last_used so it takes effect
-            cfg.save_config(config)
+            cfg.update_config(lambda latest: latest.set_default_provider(pid))
             self._refresh()
         return cb
 
     def _make_consent_cb(self, pid: str, grant: bool):
         def cb(_icon=None, _item=None) -> None:
-            config = cfg.load_config()
-            config.set_consent(pid, grant)
-            cfg.save_config(config)
+            cfg.update_config(lambda latest: latest.set_consent(pid, grant))
             self._refresh()
         return cb
 
@@ -813,8 +834,7 @@ class WindowsTrayApp:
             prov = config.get_provider(pid)
             if prov and prov.key_ref:
                 credentials.delete_key(prov.key_ref)
-            config.remove_provider(pid)
-            cfg.save_config(config)
+            cfg.update_config(lambda latest: latest.remove_provider(pid))
             self._refresh()
         return cb
 
@@ -871,9 +891,17 @@ class WindowsTrayApp:
             if key:
                 key_ref = f"provider:{pid}"
                 credentials.set_key(key_ref, key)
-        config.add_provider(ProviderConfig(
-            id=pid, type=ptype, label=pid, model=model, base_url=base_url, key_ref=key_ref))
-        cfg.save_config(config)
+        provider = ProviderConfig(
+            id=pid, type=ptype, label=pid, model=model, base_url=base_url, key_ref=key_ref)
+        try:
+            cfg.update_config(lambda latest: latest.add_provider(provider))
+        except ValueError:
+            if key_ref:
+                credentials.delete_key(key_ref)
+            _alert(tr("추가 실패", "Add failed"),
+                   tr("동일한 id가 방금 등록되었습니다.",
+                      "The same id was just registered."), kind="warning")
+            return
         self._refresh()
 
     # ---- onboarding / lifecycle ------------------------------------------ #
@@ -895,8 +923,9 @@ class WindowsTrayApp:
                 "3) To keep everything local, register the Ollama backend.",
             ),
         )
-        config.onboarding_consent_shown = True
-        cfg.save_config(config)
+        cfg.update_config(
+            lambda latest: setattr(latest, "onboarding_consent_shown", True)
+        )
 
     def _on_recheck(self, _icon=None, _item=None) -> None:
         self._refresh()

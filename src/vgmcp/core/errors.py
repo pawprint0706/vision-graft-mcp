@@ -65,6 +65,10 @@ class VGMCPError(Exception):
     """Base class for all VGMCP errors."""
 
 
+class SelfAnalysisRequired(VGMCPError):
+    """Raised before transport when the user has disabled vision backends."""
+
+
 class VisionError(VGMCPError):
     """A vision backend call failed at runtime (plan §7.8)."""
 

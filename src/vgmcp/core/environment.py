@@ -87,6 +87,8 @@ def _check_capture_permission() -> list[EnvIssue]:
 
 def _check_default_credential(config: AppConfig) -> list[EnvIssue]:
     """Verify the effective default provider has usable credentials (plan §3.2.2)."""
+    if config.self_analysis_mode:
+        return []
     provider = config.effective_default()
     if provider is None:
         return [
@@ -188,8 +190,15 @@ class EnvironmentChecker:
         add("Python ≥ 3.11", _check_python())
         add(tr("캡처 패키지", "Capture packages"), _check_capture_packages())
         add(tr("화면 기록 권한", "Screen Recording permission"), _check_capture_permission())
-        add(tr("비전 백엔드 자격증명", "Vision backend credential"),
-            _check_default_credential(config))
+        if config.self_analysis_mode:
+            report.append((
+                tr("비전 분석 방식", "Vision analysis method"),
+                True,
+                tr("셀프 분석 모드 사용 중", "Self-analysis mode enabled"),
+            ))
+        else:
+            add(tr("비전 백엔드 자격증명", "Vision backend credential"),
+                _check_default_credential(config))
         add(tr("타겟 폴더 쓰기 가능", "Target folder writable"), _check_target_folder(config))
         return report
 
@@ -197,6 +206,8 @@ class EnvironmentChecker:
         """Lazy check before analyze_vision (plan §3.2.1.2)."""
         issues: list[EnvIssue] = []
         issues += _check_python()
+        if self.config.self_analysis_mode:
+            return _status(issues)
         if provider_id:
             provider = self.config.get_provider(provider_id)
             if provider is None:
