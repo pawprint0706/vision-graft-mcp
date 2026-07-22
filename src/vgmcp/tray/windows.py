@@ -41,7 +41,7 @@ _PROVIDER_TYPES = ["anthropic", "openai", "openrouter", "custom", "ollama"]
 _MAX_WINDOWS = 30
 _REFRESH_SEC = 5
 
-# Status color -> RGBA stroke for the drawn aperture glyph.
+# Status color -> RGBA color for the camera glyph.
 # "green" (all-OK) is intentionally absent: like the macOS template icon, the OK
 # state adapts to the taskbar theme (white on a dark taskbar, black on a light
 # one) — see _status_rgb(). yellow/red stay colored because they signal status.
@@ -91,7 +91,7 @@ _ICON_CACHE: dict[tuple, object] = {}
 
 
 def _icon_path() -> Path:
-    return Path(__file__).resolve().parent.parent / "assets" / "aperture.svg"
+    return Path(__file__).resolve().parent.parent / "assets" / "camera.svg"
 
 
 def _icon_source_signature() -> tuple[int, int]:
@@ -116,7 +116,10 @@ def _status_image(color: str, size: int = 64):
     svg = _icon_path().read_text(encoding="utf-8").replace("#000000", stroke)
     png = resvg_py.svg_to_bytes(svg_string=svg, width=size, height=size)
     with Image.open(io.BytesIO(png)) as image:
-        result = image.convert("RGBA").copy()
+        rendered = image.convert("RGBA")
+        result = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        result.alpha_composite(rendered, ((size - rendered.width) // 2,
+                                          (size - rendered.height) // 2))
     _ICON_CACHE[key] = result
     return result
 
@@ -467,19 +470,22 @@ class WindowsTrayApp:
         return Menu(
             Item(self._status_title(color), self._on_recheck),
             Menu.SEPARATOR,
-            Item(tr("캡처", "Capture"), self._capture_menu()),
+            Item(tr("모니터 캡쳐", "Capture a monitor"), self._monitor_menu()),
+            Item(tr("앱 창 선택 캡쳐", "Capture an app window"), self._window_menu()),
+            Item(tr("영역 선택 캡쳐 (드래그)", "Capture a region (drag)"),
+                 self._on_capture_region),
             Item(tr("이미지 파일 열기", "Open image file"), self._on_open_image),
-            Item(tr("최근 이미지", "Recent images"), self._recent_menu()),
             Menu.SEPARATOR,
+            Item(tr("최근 이미지", "Recent images"), self._recent_menu()),
             Item(tr("마지막 이미지 분석 (테스트)", "Analyze last image (test)"),
                  self._on_analyze_last,
                  enabled=lambda _i: not cfg.load_config().self_analysis_mode),
-            Item(tr("설정", "Settings"), self._settings_menu()),
             Menu.SEPARATOR,
+            Item(tr("설정", "Settings"), self._settings_menu()),
             Item(tr("종료", "Quit"), self._on_quit),
         )
 
-    def _capture_menu(self):
+    def _monitor_menu(self):
         from ..capture import get_capture_backend  # noqa: PLC0415
 
         p = self._pystray
@@ -494,18 +500,26 @@ class WindowsTrayApp:
                     items.append(Item(label, self._make_monitor_cb(m.index)))
             except Exception:  # noqa: BLE001
                 pass
-            win_items: list = []
+        if not items:
+            items.append(Item(tr("(모니터 없음)", "(no monitors)"), None, enabled=False))
+        return Menu(*items)
+
+    def _window_menu(self):
+        from ..capture import get_capture_backend  # noqa: PLC0415
+
+        p = self._pystray
+        Item, Menu = p.MenuItem, p.Menu
+        items: list = []
+        backend = get_capture_backend()
+        if backend is not None:
             try:
                 for wi in backend.list_windows()[:_MAX_WINDOWS]:
                     label = f"{wi.app_name} — {wi.title[:30]}" if wi.title else wi.app_name
-                    win_items.append(Item(label, self._make_window_cb(wi.window_id)))
+                    items.append(Item(label, self._make_window_cb(wi.window_id)))
             except Exception:  # noqa: BLE001
                 pass
-            if not win_items:
-                win_items.append(Item(tr("(창 없음)", "(no windows)"), None, enabled=False))
-            items.append(Item(tr("앱 창 선택 캡처", "Capture an app window"), Menu(*win_items)))
-        items.append(Item(tr("영역 선택 캡처 (드래그)", "Capture a region (drag)"),
-                          self._on_capture_region))
+        if not items:
+            items.append(Item(tr("(창 없음)", "(no windows)"), None, enabled=False))
         return Menu(*items)
 
     def _recent_menu(self):

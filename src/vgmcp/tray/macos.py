@@ -46,8 +46,8 @@ _ANALYZE_PROMPT = (
 # --------------------------------------------------------------------------- #
 # Dialog helpers (AppKit)
 # --------------------------------------------------------------------------- #
-def _aperture_nsimage(size: int, template: bool):
-    """Load our aperture icon as an NSImage. As a template image it adapts to the
+def _camera_nsimage(size: int, template: bool):
+    """Load our camera icon as an NSImage. As a template image it adapts to the
     dialog's light/dark appearance (so it's visible on both)."""
     from ..core import icons  # noqa: PLC0415
 
@@ -65,8 +65,8 @@ def _aperture_nsimage(size: int, template: bool):
 
 
 def _brand_alert_icon(alert) -> None:
-    """Replace a dialog's default (Python) app icon with our aperture icon."""
-    img = _aperture_nsimage(64, template=True)
+    """Replace a dialog's default (Python) app icon with our camera icon."""
+    img = _camera_nsimage(64, template=True)
     if img is not None:
         alert.setIcon_(img)
 
@@ -138,7 +138,7 @@ def _pick_path(*, directory: bool, file_types: list[str] | None = None) -> str |
 
 
 def _notify(title: str, message: str) -> None:
-    """Show a message as a modal dialog (branded aperture icon) rather than a
+    """Show a message as a modal dialog (branded camera icon) rather than a
     toast. Toasts can't show our icon for an unbundled app, and these are all
     failure messages anyway, so a dismissible dialog is clearer."""
     post_to_main(lambda: _alert(title, message))
@@ -160,7 +160,8 @@ def _make_app_class():
 
             self.status_item = rumps.MenuItem(tr("상태: 확인 중", "Status: checking…"),
                                               callback=self.recheck)
-            self.cap_menu = rumps.MenuItem(tr("캡처", "Capture"))
+            self.monitor_menu = rumps.MenuItem(tr("모니터 캡쳐", "Capture a monitor"))
+            self.window_menu = rumps.MenuItem(tr("앱 창 선택 캡쳐", "Capture an app window"))
             self.recent_menu = rumps.MenuItem(tr("최근 이미지", "Recent images"))
             self.backend_menu = rumps.MenuItem(tr("비전 백엔드 관리", "Manage vision backends"))
             self.self_analysis_item = rumps.MenuItem(
@@ -191,13 +192,16 @@ def _make_app_class():
             self.menu = [
                 self.status_item,
                 None,
-                self.cap_menu,
+                self.monitor_menu,
+                self.window_menu,
+                rumps.MenuItem(tr("영역 선택 캡쳐 (드래그)", "Capture a region (drag)"),
+                               callback=self.cap_region),
                 rumps.MenuItem(tr("이미지 파일 열기", "Open image file"), callback=self.open_image),
+                None,
                 self.recent_menu,
-                None,
                 self.analyze_item,
-                settings,
                 None,
+                settings,
             ]
             self.refresh()
             self.timer = rumps.Timer(lambda _=None: self.refresh(), 5)
@@ -235,7 +239,7 @@ def _make_app_class():
         def refresh(self, _sender=None) -> None:
             try:
                 self._refresh_status()
-                self._refresh_capture_menu()
+                self._refresh_capture_menus()
                 self._refresh_recent_menu()
                 self._refresh_backend_menu()
                 config = cfg.load_config()
@@ -295,33 +299,34 @@ def _make_app_class():
                 self.icon = None
                 self.title = _ICON.get(color, _ICON["gray"])
 
-        def _refresh_capture_menu(self) -> None:
+        def _refresh_capture_menus(self) -> None:
             from ..capture import get_capture_backend  # noqa: PLC0415
 
-            items: list = []
+            monitors: list = []
+            windows: list = []
             backend = get_capture_backend()
             if backend is not None:
                 try:
                     for m in backend.list_monitors():
                         label = tr(f"모니터 {m.index} ({m.width}×{m.height})",
                                    f"Monitor {m.index} ({m.width}×{m.height})")
-                        items.append(rumps.MenuItem(
+                        monitors.append(rumps.MenuItem(
                             label, callback=self._make_monitor_cb(m.index)))
                 except Exception:  # noqa: BLE001
                     pass
-                wins_parent = rumps.MenuItem(tr("앱 창 선택 캡처", "Capture an app window"))
                 try:
-                    wins = backend.list_windows()[:_MAX_WINDOWS]
-                    for wi in wins:
+                    for wi in backend.list_windows()[:_MAX_WINDOWS]:
                         label = f"{wi.app_name} — {wi.title[:30]}" if wi.title else wi.app_name
-                        wins_parent.add(rumps.MenuItem(
+                        windows.append(rumps.MenuItem(
                             label, callback=self._make_window_cb(wi.window_id)))
                 except Exception:  # noqa: BLE001
                     pass
-                items.append(wins_parent)
-            items.append(rumps.MenuItem(tr("영역 선택 캡처 (드래그)", "Capture a region (drag)"),
-                                        callback=self.cap_region))
-            _set_children(self.cap_menu, items)
+            if not monitors:
+                monitors.append(rumps.MenuItem(tr("(모니터 없음)", "(no monitors)")))
+            if not windows:
+                windows.append(rumps.MenuItem(tr("(창 없음)", "(no windows)")))
+            _set_children(self.monitor_menu, monitors)
+            _set_children(self.window_menu, windows)
 
         def _refresh_recent_menu(self) -> None:
             config = cfg.load_config()
@@ -700,8 +705,8 @@ def _hide_dock_icon() -> None:
 
         app = NSApplication.sharedApplication()
         app.setActivationPolicy_(1)  # Accessory
-        # If a Dock icon ever does appear, show our aperture (not the Python icon).
-        img = _aperture_nsimage(256, template=False)
+        # If a Dock icon ever does appear, show our camera (not the Python icon).
+        img = _camera_nsimage(256, template=False)
         if img is not None:
             app.setApplicationIconImage_(img)
     except Exception:  # noqa: BLE001

@@ -298,13 +298,13 @@ choice override every tool argument. Calls and retries started after activation
 never use a vision backend; requests already in progress may finish. VGMCP
 returns the image directly to the calling LLM without a capability check. A model
 without vision support cannot analyze it. A missing vision backend is not an
-environment error in this mode, and **Analyze last image** is disabled in the tray.
+environment error in this mode, and **Analyze last image (test)** is disabled in the tray.
 
 ## Tray menu (direct use)
 
-- **Capture** — a whole monitor · a specific app window · drag-select a region
-  · open an existing image file.
-- **Analyze last image** — sends the most recent capture to the vision backend
+- **Monitor/app-window/region capture** — choose a target directly from each
+  top-level tray item; **Open image file** registers an existing image.
+- **Analyze last image (test)** — sends the most recent image to the vision backend
   and shows the result.
 - **Recent images** — click one to copy a ready-to-paste prompt (with the
   image path) to the clipboard (template editable in Settings).
@@ -382,7 +382,7 @@ For a `custom` backend, also pass `--base-url "https://your-endpoint/v1"`.
   defaults to the OS language) · `VGMCP_SERVER_URL` (host URL the adapter
   connects to, default `http://127.0.0.1:8765/mcp`; or set parts via
   `VGMCP_HOST` / `VGMCP_PORT` / `VGMCP_PATH`)
-- **Tray/dialog icon** — single source of truth: `src/vgmcp/assets/aperture.svg`.
+- **Tray/dialog icon** — single source of truth: `src/vgmcp/assets/camera.svg`.
   macOS rasterizes it to PNGs cached in `~/.config/vgmcp/icons/`; Windows
   renders that SVG directly with `resvg-py`, so changing the asset updates both
   platforms without mirrored coordinates.

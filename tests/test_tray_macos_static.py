@@ -53,7 +53,7 @@ def test_refresh_updates_checkmark_and_disables_analysis(tmp_path, monkeypatch):
     app = _app(monkeypatch)
     app.refresh = app.__class__.refresh.__get__(app)
     app._refresh_status = lambda: None
-    app._refresh_capture_menu = lambda: None
+    app._refresh_capture_menus = lambda: None
     app._refresh_recent_menu = lambda: None
     app._refresh_backend_menu = lambda: None
     app.self_analysis_item = SimpleNamespace(state=0)

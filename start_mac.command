@@ -25,5 +25,5 @@ fi
 # Launch detached so this Terminal window can be closed.
 nohup ./.venv/bin/vgmcp >/dev/null 2>&1 &
 msg "✅ VGMCP를 메뉴바에 실행했습니다. (화면 오른쪽 위의 조리개 아이콘)" \
-    "✅ VGMCP is now running in the menu bar (aperture icon, top-right)."
+    "✅ VGMCP is now running in the menu bar (camera icon, top-right)."
 msg "이 창은 닫아도 됩니다." "You can close this window."

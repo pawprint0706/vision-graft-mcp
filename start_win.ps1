@@ -43,5 +43,5 @@ if (Test-Path $pythonw) {
 }
 
 Msg "✅ VGMCP를 트레이에 실행했습니다. (작업 표시줄 오른쪽의 조리개 아이콘)" `
-    "✅ VGMCP is now running in the system tray (aperture icon, bottom-right)."
+    "✅ VGMCP is now running in the system tray (camera icon, bottom-right)."
 Msg "이 창은 닫아도 됩니다." "You can close this window."

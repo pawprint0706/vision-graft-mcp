@@ -66,11 +66,44 @@ def test_analyze_last_is_disabled_in_self_analysis_mode(tmp_path, monkeypatch):
     cfg.save_config(config)
 
     menu = _app()._build_menu()
-    item = next(i for i in menu.items if str(i.text).startswith("Analyze last image"))
+    item = next(i for i in menu.items if str(i.text) == "Analyze last image (test)")
     assert item.enabled is False
 
 
+def test_top_menu_order(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    monkeypatch.setenv("VGMCP_LANG", "ko")
+
+    labels = ["---" if item is pystray.Menu.SEPARATOR else str(item.text)
+              for item in _app()._build_menu().items]
+
+    assert labels == [
+        "상태: 조치 필요",
+        "---",
+        "모니터 캡쳐",
+        "앱 창 선택 캡쳐",
+        "영역 선택 캡쳐 (드래그)",
+        "이미지 파일 열기",
+        "---",
+        "최근 이미지",
+        "마지막 이미지 분석 (테스트)",
+        "---",
+        "설정",
+        "종료",
+    ]
+
+
+def test_recent_menu_keeps_target_folder_action(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    monkeypatch.setenv("VGMCP_LANG", "ko")
+
+    labels = [str(item.text) for item in _app()._recent_menu().items]
+
+    assert labels[0] == "타겟 폴더 열기"
+
+
 def test_status_icon_is_rendered_from_shared_svg(tmp_path, monkeypatch):
+    assert windows._icon_path().name == "camera.svg"
     svg = tmp_path / "icon.svg"
     svg.write_text(
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">'

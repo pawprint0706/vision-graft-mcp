@@ -37,17 +37,19 @@ def app(tmp_path, monkeypatch):
 
 def test_top_menu(app):
     keys = list(app.menu.keys())
-    assert "캡처" in keys
+    assert "모니터 캡쳐" in keys
+    assert "앱 창 선택 캡쳐" in keys
+    assert "영역 선택 캡쳐 (드래그)" in keys
+    assert "이미지 파일 열기" in keys
     assert "설정" in keys
     assert "최근 이미지" in keys
-    assert any(k.startswith("마지막 이미지 분석") for k in keys)
+    assert "마지막 이미지 분석 (테스트)" in keys
 
 
 def test_status_item_is_first(app):
     keys = list(app.menu.keys())
     status_key = next(k for k in keys if k.startswith("상태"))
-    # Status item sits above 캡처, with a separator between them.
-    assert keys.index(status_key) < keys.index("캡처")
+    assert keys.index(status_key) < keys.index("모니터 캡쳐")
     assert app.status_item.title.startswith("상태:")
 
 
@@ -61,23 +63,24 @@ def test_self_analysis_precedes_backend_setting(app):
     assert keys.index("셀프 분석 모드 사용") < keys.index("비전 백엔드 관리")
 
 
-def test_capture_submenu(app):
-    caps = list(app.menu["캡처"].keys())
-    assert any("모니터" in k for k in caps)
-    assert "앱 창 선택 캡처" in caps
-    assert "영역 선택 캡처 (드래그)" in caps
+def test_capture_submenus(app):
+    assert any("모니터" in key for key in app.menu["모니터 캡쳐"].keys())
+    assert list(app.menu["앱 창 선택 캡쳐"].keys())
+
+
+def test_recent_menu_keeps_target_folder_action(app):
+    assert list(app.menu["최근 이미지"].keys())[0] == "타겟 폴더 열기"
 
 
 def test_menu_order(app):
     keys = [k for k in app.menu.keys() if not k.startswith("Separator")]
-    # status -> 캡처 -> 이미지 파일 열기 -> 최근 이미지 -> 분석(테스트) -> 설정
     def idx(prefix):
         return next(i for i, k in enumerate(keys) if k.startswith(prefix))
 
-    assert idx("상태") < idx("캡처") < idx("이미지 파일 열기") < idx("최근 이미지")
-    assert idx("최근 이미지") < idx("마지막 이미지 분석") < idx("설정")
-    # '이미지 파일 열기' is now top-level, not inside the capture submenu
-    assert "이미지 파일 열기" in keys
+    assert idx("상태") < idx("모니터 캡쳐") < idx("앱 창 선택 캡쳐")
+    assert idx("앱 창 선택 캡쳐") < idx("영역 선택 캡쳐") < idx("이미지 파일 열기")
+    assert idx("이미지 파일 열기") < idx("최근 이미지") < idx("마지막 이미지 분석")
+    assert idx("마지막 이미지 분석") < idx("설정") < idx("종료")
 
 
 def test_backend_submenu_reflects_default(app):
@@ -92,6 +95,6 @@ def test_status_uses_svg_icon(app):
 
     assert app.icon is not None
     assert Path(app.icon).exists()
-    assert "normal" in Path(app.icon).name
+    assert "camera_normal" in Path(app.icon).name
     assert app.template is True  # normal icon is a template (auto light/dark)
     assert app.title is None

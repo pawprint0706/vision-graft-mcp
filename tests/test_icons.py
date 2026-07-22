@@ -1,4 +1,4 @@
-"""Menu-bar status icon generation from the aperture SVG (plan §4.3)."""
+"""Menu-bar status icon generation from the camera SVG (plan §4.3)."""
 
 from __future__ import annotations
 

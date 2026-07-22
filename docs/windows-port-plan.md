@@ -122,7 +122,7 @@ elif is_windows() and module_available("mss"):
 | macOS 구현 | Windows 대응 |
 |------------|--------------|
 | `rumps` 메뉴바 앱 | `pystray`(windows extra 포함) 시스템 트레이 |
-| `NSImage` 아이콘 브랜딩 (`assets/aperture.svg`) | SVG→PNG/ICO 렌더 후 `PIL.Image`로 트레이 아이콘 설정 |
+| `NSImage` 아이콘 브랜딩 (`assets/camera.svg`) | SVG→PNG/ICO 렌더 후 `PIL.Image`로 트레이 아이콘 설정 |
 | `NSAlert` 모달/토스트 | `tkinter.messagebox` 또는 `win32ui` MessageBox, 토스트는 `winrt`/`win10toast` 선택 |
 | `NSOpenPanel` (폴더 선택) | `tkinter.filedialog.askdirectory` |
 | `NSPopUpButton` (provider 선택 등) | pystray 서브메뉴 또는 tkinter 다이얼로그 |

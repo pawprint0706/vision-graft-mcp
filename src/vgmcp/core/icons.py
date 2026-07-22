@@ -1,4 +1,4 @@
-"""Menu-bar status icons generated from the aperture SVG (plan §4.3).
+"""Menu-bar status icons generated from the camera SVG (plan §4.3).
 
 Three states, recolored from a single line-art SVG and rasterized to PNG with
 NSImage (no extra dependencies):
@@ -13,7 +13,7 @@ size just means crisper retina output.
 
 Per Apple's HIG for menu-bar extras, the glyph must not fill the bar edge to
 edge — it needs interior padding (recommended optical size ~16pt inside the
-~22pt bar). The source aperture SVG fills its whole viewBox, so we bake a
+~22pt bar). The source camera SVG fills its whole viewBox, so we bake a
 transparent margin into the raster (`_PADDING_FRACTION`) and thin the stroke
 toward the HIG's 1.5–2pt range. The `normal` state is rendered black + alpha as
 a Template image, so macOS recolors it (black / white / translucent gray) to
@@ -40,10 +40,6 @@ _COLORS = {
 # displayed glyph from the bar-filling ~18-20pt down to a comfortable ~16pt.
 _PADDING_FRACTION = 0.13
 
-# Stroke weight for the line art (HIG suggests ~1.5-2pt). The source SVG uses 2;
-# a hair thinner reads cleaner once the icon shrinks into the bar.
-_STROKE_WIDTH = "1.6"
-
 # Cache-key version. Bump when the rendered appearance changes (padding, stroke,
 # color) so previously cached PNGs are regenerated instead of reused.
 _RENDER_VERSION = "v2"
@@ -62,7 +58,7 @@ def is_template(state: str) -> bool:
 
 
 def _base_svg() -> str:
-    return (Path(__file__).resolve().parent.parent / "assets" / "aperture.svg").read_text(
+    return (Path(__file__).resolve().parent.parent / "assets" / "camera.svg").read_text(
         encoding="utf-8"
     )
 
@@ -82,7 +78,6 @@ def _rasterize(svg_text: str, size: int, dest: Path) -> bool:
             NSGraphicsContext,
             NSImage,
             NSMakeRect,
-            NSMakeSize,
             NSZeroRect,
         )
         from Foundation import NSData  # noqa: PLC0415
@@ -98,7 +93,16 @@ def _rasterize(svg_text: str, size: int, dest: Path) -> bool:
     # (HIG interior padding); the rest of the canvas stays clear.
     pad = round(size * _PADDING_FRACTION)
     inner = size - 2 * pad
-    img.setSize_(NSMakeSize(inner, inner))
+    source_size = img.size()
+    source_width = float(source_size.width)
+    source_height = float(source_size.height)
+    if source_width <= 0 or source_height <= 0:
+        return False
+    scale = min(inner / source_width, inner / source_height)
+    draw_width = source_width * scale
+    draw_height = source_height * scale
+    draw_x = (size - draw_width) / 2
+    draw_y = (size - draw_height) / 2
 
     rep = NSBitmapImageRep.alloc().initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel_(  # noqa: E501
         None, size, size, 8, 4, True, False, "NSCalibratedRGBColorSpace", 0, 0
@@ -109,7 +113,10 @@ def _rasterize(svg_text: str, size: int, dest: Path) -> bool:
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.setCurrentContext_(ctx)
     img.drawInRect_fromRect_operation_fraction_(
-        NSMakeRect(pad, pad, inner, inner), NSZeroRect, NSCompositingOperationSourceOver, 1.0
+        NSMakeRect(draw_x, draw_y, draw_width, draw_height),
+        NSZeroRect,
+        NSCompositingOperationSourceOver,
+        1.0,
     )
     NSGraphicsContext.restoreGraphicsState()
 
@@ -123,13 +130,13 @@ def get_icon(state: str, size: int = DEFAULT_SIZE) -> Path | None:
     """Return a PNG path for the given state, generating/caching as needed."""
     if state not in _COLORS:
         state = "normal"
-    dest = _icons_dir() / f"aperture_{state}_{size}_{_RENDER_VERSION}.png"
+    dest = _icons_dir() / f"camera_{state}_{size}_{_RENDER_VERSION}.png"
     if dest.exists():
         return dest
     svg = (
         _base_svg()
         .replace('stroke="#000000"', f'stroke="{_COLORS[state]}"')
-        .replace('stroke-width="2"', f'stroke-width="{_STROKE_WIDTH}"')
+        .replace('fill="#000000"', f'fill="{_COLORS[state]}"')
     )
     return dest if _rasterize(svg, size, dest) else None
 
