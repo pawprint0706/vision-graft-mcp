@@ -36,13 +36,13 @@ _COLORS = {
 }
 
 # Transparent margin baked into every side of the raster, as a fraction of the
-# canvas. The source glyph spans ~0.9 of its viewBox, so ~0.13 padding brings the
-# displayed glyph from the bar-filling ~18-20pt down to a comfortable ~16pt.
-_PADDING_FRACTION = 0.13
+# canvas. Five percent padding on each side uses 90% of the available area while
+# retaining a small buffer from the menu-bar edges.
+_PADDING_FRACTION = 0.05
 
 # Cache-key version. Bump when the rendered appearance changes (padding, stroke,
 # color) so previously cached PNGs are regenerated instead of reused.
-_RENDER_VERSION = "v2"
+_RENDER_VERSION = "v4"
 
 DEFAULT_SIZE = 36  # render px; displayed at the menu bar's ~20pt (retina-crisp)
 
