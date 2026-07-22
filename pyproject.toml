@@ -35,6 +35,7 @@ macos = [
 windows = [
     "pywin32>=306",      # window enumeration / process names (win32gui, win32api)
     "pystray>=0.19",     # system-tray icon + menu
+    "resvg-py>=0.3.3",   # render the shared SVG icon without system dependencies
     "mss>=9.0",          # monitor / region / window screen capture
     "pyperclip>=1.8",    # clipboard copy (core.clipboard fallback)
 ]

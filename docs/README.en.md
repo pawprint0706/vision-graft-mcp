@@ -382,9 +382,9 @@ For a `custom` backend, also pass `--base-url "https://your-endpoint/v1"`.
   defaults to the OS language) · `VGMCP_SERVER_URL` (host URL the adapter
   connects to, default `http://127.0.0.1:8765/mcp`; or set parts via
   `VGMCP_HOST` / `VGMCP_PORT` / `VGMCP_PATH`)
-- **Tray icon** — single source of truth: `src/vgmcp/assets/aperture.svg`.
+- **Tray/dialog icon** — single source of truth: `src/vgmcp/assets/aperture.svg`.
   macOS rasterizes it to PNGs cached in `~/.config/vgmcp/icons/`; Windows
-  draws the same geometry in-memory with Pillow (coordinates mirrored in
-  `tray/windows.py`) — if you change the SVG, update those coordinates too.
+  renders that SVG directly with `resvg-py`, so changing the asset updates both
+  platforms without mirrored coordinates.
 
 License: [MIT](../LICENSE)

@@ -23,6 +23,7 @@ otherwise English).
 from __future__ import annotations
 
 import functools
+import io
 import json
 import queue
 import threading
@@ -83,71 +84,39 @@ _ANALYZE_PROMPT = (
 
 
 # --------------------------------------------------------------------------- #
-# Status icon — the brand aperture, drawn with PIL (no SVG rasterizer on Windows)
+# Status icon — rendered from the shared SVG source
 # --------------------------------------------------------------------------- #
-# Geometry mirrors src/vgmcp/assets/aperture.svg (the macOS source of truth):
-# a circle + 6 iris blades in a 20-unit space, after the SVG's net translate
-# (-2, -2). Keep in sync if aperture.svg ever changes.
-#
-# NOTE: unlike macOS (where rumps renders the glyph at a fixed 20pt and it needs
-# ~13% baked-in padding to not fill the bar), the Windows tray scales this image
-# into its own slot — extra interior padding just makes the glyph read too small.
-# So we run the OPPOSITE way here: a tight 20-unit viewBox (the glyph's native
-# extent) so it fills as much of the tray slot as possible. The glyph is centered
-# on (10, 10) and its 1.8 stroke's outer edge lands at ~0.1..19.9 — only ~0.1
-# units of margin per side, so this is effectively the maximum size before the
-# stroke would clip against the canvas edge.
-_APERTURE_VB = 20.0
-_APERTURE_CIRCLE = (10.0, 10.0, 9.0)  # cx, cy, r
-_APERTURE_LINES = (
-    (10.0, 1.0, 13.4384781, 10.6277387),
-    (2.20577125, 5.5, 12.2628766, 7.33606),
-    (2.20577125, 14.5, 8.8243984, 6.70832125),
-    (10.0, 19.0, 6.56152188, 9.3722612),
-    (17.7942287, 14.5, 7.73712344, 12.66394),
-    (17.7942288, 5.5, 11.1756016, 13.2916788),
-)
-_APERTURE_STROKE = 1.8  # in viewBox units
-
-# Generated icons cached by (color, light_theme, size) — the aperture is drawn
-# once per distinct appearance (Windows' analogue of macOS icons.pregenerate).
+# Generated icons are cached by source revision and appearance.
 _ICON_CACHE: dict[tuple, object] = {}
 
 
-def _status_image(color: str, size: int = 64):
-    """Render the aperture icon in the status color (4x supersampled, round caps).
+def _icon_path() -> Path:
+    return Path(__file__).resolve().parent.parent / "assets" / "aperture.svg"
 
-    Cached per (color, taskbar theme, size); redrawn only when one of those
-    changes."""
+
+def _icon_source_signature() -> tuple[int, int]:
+    stat = _icon_path().stat()
+    return stat.st_mtime_ns, stat.st_size
+
+
+def _status_image(color: str, size: int = 64):
+    """Render the shared SVG in the status color and return a Pillow image."""
     light = _taskbar_uses_light_theme()
-    key = (color, light, size)
+    source_sig = _icon_source_signature()
+    key = (color, light, size, source_sig)
     cached = _ICON_CACHE.get(key)
     if cached is not None:
         return cached
 
-    from PIL import Image, ImageDraw  # noqa: PLC0415
+    import resvg_py  # noqa: PLC0415
+    from PIL import Image  # noqa: PLC0415
 
-    rgb = _status_rgb(color, light)
-    ss = 4  # supersample, then downscale for smooth (antialiased) edges
-    res = size * ss
-    u = res / _APERTURE_VB  # units -> supersampled pixels
-    width = max(1, round(_APERTURE_STROKE * u))
-    cap = width / 2.0  # round-cap radius
-
-    img = Image.new("RGBA", (res, res), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-
-    cx, cy, r = (v * u for v in _APERTURE_CIRCLE)
-    draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=rgb, width=width)
-
-    for x1, y1, x2, y2 in _APERTURE_LINES:
-        p1 = (x1 * u, y1 * u)
-        p2 = (x2 * u, y2 * u)
-        draw.line([p1, p2], fill=rgb, width=width)
-        for px, py in (p1, p2):  # round line caps
-            draw.ellipse([px - cap, py - cap, px + cap, py + cap], fill=rgb)
-
-    result = img.resize((size, size), Image.LANCZOS)
+    rgba = _status_rgb(color, light)
+    stroke = "#{:02X}{:02X}{:02X}".format(*rgba[:3])
+    svg = _icon_path().read_text(encoding="utf-8").replace("#000000", stroke)
+    png = resvg_py.svg_to_bytes(svg_string=svg, width=size, height=size)
+    with Image.open(io.BytesIO(png)) as image:
+        result = image.convert("RGBA").copy()
     _ICON_CACHE[key] = result
     return result
 
@@ -207,8 +176,12 @@ def _on_ui(fn):
 # --------------------------------------------------------------------------- #
 def _new_root():
     import tkinter as tk  # noqa: PLC0415
+    from PIL import ImageTk  # noqa: PLC0415
 
     root = tk.Tk()
+    icon = ImageTk.PhotoImage(_status_image("green", 64), master=root)
+    root.iconphoto(True, icon)
+    root._vgmcp_icon = icon  # keep the Tk image alive for the window lifetime
     root.withdraw()
     root.attributes("-topmost", True)
     return root
@@ -600,7 +573,7 @@ class WindowsTrayApp:
             # (status or taskbar theme), avoiding a redundant Shell_NotifyIcon
             # call every tick. The menu is always rebuilt (dynamic contents).
             color = self._status_color()
-            sig = (color, _taskbar_uses_light_theme())
+            sig = (color, _taskbar_uses_light_theme(), _icon_source_signature())
             if sig != self._icon_sig:
                 self.icon.icon = _status_image(color)
                 self._icon_sig = sig

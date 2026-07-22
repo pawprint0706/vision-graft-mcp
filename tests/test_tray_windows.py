@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from vgmcp.core import config as cfg
@@ -66,3 +68,20 @@ def test_analyze_last_is_disabled_in_self_analysis_mode(tmp_path, monkeypatch):
     menu = _app()._build_menu()
     item = next(i for i in menu.items if str(i.text).startswith("Analyze last image"))
     assert item.enabled is False
+
+
+def test_status_icon_is_rendered_from_shared_svg(tmp_path, monkeypatch):
+    svg = tmp_path / "icon.svg"
+    svg.write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">'
+        '<rect width="10" height="10" fill="#000000"/></svg>',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(windows, "_icon_path", lambda: Path(svg))
+    monkeypatch.setattr(windows, "_taskbar_uses_light_theme", lambda: False)
+    windows._ICON_CACHE.clear()
+
+    image = windows._status_image("green", 24)
+
+    assert image.size == (24, 24)
+    assert image.getpixel((12, 12)) == (255, 255, 255, 255)

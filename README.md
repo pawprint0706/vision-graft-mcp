@@ -362,9 +362,8 @@ vgmcp autostart enable|disable|status      # 로그인 시 자동 시작
   `VGMCP_SERVER_URL`(어댑터가 접속할 호스트 URL, 기본
   `http://127.0.0.1:8765/mcp`; `VGMCP_HOST` / `VGMCP_PORT` / `VGMCP_PATH`로 부분
   지정 가능)
-- **트레이 아이콘** — 원본은 `src/vgmcp/assets/aperture.svg` 하나. macOS는 PNG로
-  래스터화해 `~/.config/vgmcp/icons/`에 캐시하고, Windows는 같은 도형을 Pillow로
-  메모리에서 그립니다(`tray/windows.py`에 좌표 미러) — SVG를 바꾸면 Windows
-  좌표도 함께 갱신하세요.
+- **트레이/모달 아이콘** — 원본은 `src/vgmcp/assets/aperture.svg` 하나. macOS는 PNG로
+  래스터화해 `~/.config/vgmcp/icons/`에 캐시하고, Windows는 `resvg-py`로 SVG를 직접
+  렌더링합니다. SVG를 바꾸면 양쪽 운영체제에 동일하게 반영됩니다.
 
 라이선스: [MIT](LICENSE)
